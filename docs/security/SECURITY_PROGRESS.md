@@ -39,3 +39,22 @@ This file records the audit, fixes, test evidence, gate verification, and commit
   - 4/4 tests passing in `agent/tests/test_security_hardening.py`.
 - **Findings Report**: Documented in `docs/security/stage-S2-findings.md`.
 - **Commit**: `security-s2: Transport security and mTLS complete`
+
+---
+
+## Stage S3: Stream Encryption and Anti-Replay   [PASSED]
+- **Application-Layer Session Crypto**:
+  - `KeyExchangeSession` (`hub_backend/security/session_crypto.py`) and `AgentStreamCipher` (`agent/security/stream_cipher.py`) implementing ephemeral X25519 ECDH key exchange with HKDF-SHA256 session key expansion.
+  - AES-256-GCM frame encryption envelope with unique nonces derived from epoch and 64-bit sequence counters.
+- **Anti-Replay Protection**:
+  - 128-packet sliding window anti-replay filter (`AntiReplayWindow`) rejecting replayed frames and stale out-of-window packets.
+- **HLS Segment Encryption**:
+  - `HLSSegmentEncryptor` (`hub_backend/security/hls_crypto.py`) providing AES-128-CBC segment encryption and token-authorized key delivery (`#EXT-X-KEY`).
+- **Evidence Verification**:
+  - Shannon entropy measured at **7.953 bits/byte** ($\ge 7.8$ threshold).
+  - Packet inspection confirmed 0 cleartext RTSP commands, NAL unit delimiters, or video data on the wire.
+  - Replay of captured frames and bit-tampered packets strictly rejected.
+- **Tests**:
+  - 10/10 tests passing in `hub-backend/tests/test_stream_encryption.py`.
+- **Findings Report**: Documented in `docs/security/stage-S3-findings.md`.
+- **Commit**: `security-s3: Stream encryption and anti-replay complete`
