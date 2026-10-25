@@ -44,6 +44,9 @@ async def authenticate_user(
     user = res.scalar_one_or_none()
 
     if not user:
+        from hub_backend.security.password import dummy_verify
+
+        dummy_verify(password)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

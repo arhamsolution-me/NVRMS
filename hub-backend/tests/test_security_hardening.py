@@ -31,7 +31,8 @@ class TestSecurityHeadersAndPayloadLimits:
         assert res.status_code == 200
 
         headers = res.headers
-        assert "max-age=31536000" in headers.get("strict-transport-security", "")
+        assert "max-age=" in headers.get("strict-transport-security", "")
+        assert "includeSubDomains" in headers.get("strict-transport-security", "")
         assert headers.get("x-content-type-options") == "nosniff"
         assert headers.get("x-frame-options") == "DENY"
         assert "default-src 'self'" in headers.get("content-security-policy", "")

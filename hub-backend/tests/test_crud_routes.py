@@ -151,7 +151,7 @@ class TestCRUDRoutes:
             headers=headers,
             json={
                 "email": email,
-                "password": "Password123!",
+                "password": "StrongPass2026!#",
                 "full_name": "Front Desk Staff",
                 "role_id": str(role.id),
                 "is_active": True,

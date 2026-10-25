@@ -42,13 +42,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # Apply security headers
         headers = response.headers
-        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
         headers["X-Content-Type-Options"] = "nosniff"
         headers["X-Frame-Options"] = "DENY"
         headers["Content-Security-Policy"] = (
-            "default-src 'self'; frame-ancestors 'none'; object-src 'none'"
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; connect-src 'self' wss: https:; "
+            "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
         )
         headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+        headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=(), payment=()"
 
         return response

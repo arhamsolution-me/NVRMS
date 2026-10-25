@@ -13,7 +13,7 @@ from hub_backend.db import get_db
 from hub_backend.models.rbac import Role
 from hub_backend.models.user import User, UserScope
 from hub_backend.schemas.user import UserCreate, UserResponse, UserUpdate
-from hub_backend.security.password import hash_password
+from hub_backend.security.password import check_password_strength, hash_password
 from hub_backend.security.rbac import require_permission
 from hub_backend.services.audit import record_audit_log
 from hub_backend.services.auth import check_last_superadmin_protection
@@ -56,6 +56,11 @@ async def create_user(
     role = await db.get(Role, req.role_id)
     if not role:
         raise HTTPException(status_code=400, detail="Role not found")
+
+    # Validate password complexity and breach list
+    is_valid, err_msg = check_password_strength(req.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Password does not meet security policy: {err_msg}")
 
     user = User(
         tenant_id=current_user.tenant_id,
@@ -153,6 +158,9 @@ async def update_user(
     if req.is_active is not None:
         user.is_active = req.is_active
     if req.password:
+        is_valid, err_msg = check_password_strength(req.password)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"Password does not meet security policy: {err_msg}")
         user.password_hash = hash_password(req.password)
 
     # Scopes update if provided

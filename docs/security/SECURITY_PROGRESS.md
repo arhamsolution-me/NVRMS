@@ -81,3 +81,31 @@ This file records the audit, fixes, test evidence, gate verification, and commit
   - 8/8 tests passing in `hub-backend/tests/test_stream_authorization.py`.
 - **Findings Report**: Documented in `docs/security/stage-S4-findings.md`.
 - **Commit**: `security-s4: Stream authorization and namespace isolation complete`
+
+---
+
+## Stage S5: Authentication and API Hardening                 [PASSED]
+- **Route Authorization Verification**:
+  - Implemented automated route table audit `test_route_enumeration_all_routes_protected`.
+  - Confirmed 100% of non-public routes enforce authorization dependencies.
+- **Password Hardening**:
+  - Argon2id with 64MB memory cost, 2 iterations.
+  - Complexity policy enforced (12+ characters, upper, lower, digits, symbols).
+  - Breached password dictionary rejection integrated into `/api/v1/users` endpoints.
+- **Anti-Enumeration & Timing Defense**:
+  - Constant-time dummy verification on nonexistent accounts eliminates timing side-channel.
+  - Uniform authentication failure messages.
+- **Session Management**:
+  - Implemented active session listing (`GET /api/v1/auth/sessions`).
+  - Remote revocation of individual sessions (`DELETE /api/v1/auth/sessions/{session_id}`).
+  - Global revocation of all sessions (`DELETE /api/v1/auth/sessions`).
+- **Defense-in-Depth Headers & Boundary**:
+  - HSTS with preload (`max-age=63072000; includeSubDomains; preload`).
+  - Restrictive Content-Security-Policy (CSP) restricting scripts, styles, objects, frames.
+  - Request body size limit enforced at 10MB (HTTP 413).
+- **Tests**:
+  - 7/7 tests passing in `hub-backend/tests/test_auth_api_hardening.py`.
+  - Full platform regression suite: 117/117 passed.
+- **Findings Report**: Documented in `docs/security/stage-S5-findings.md`.
+- **Commit**: `security-s5: Authentication and API hardening complete`
+

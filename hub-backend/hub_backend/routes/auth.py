@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hub_backend.config import get_settings
 from hub_backend.db import get_db
-from hub_backend.models.user import User
+from hub_backend.models.user import RefreshToken, User
 from hub_backend.schemas.auth import (
     LoginRequest,
     MeResponse,
@@ -231,3 +236,94 @@ async def totp_verify(
     await db.commit()
 
     return {"status": "ok", "message": "Two-factor authentication enabled successfully"}
+
+
+@router.get("/sessions", summary="List active sessions for current user")
+async def list_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Return active login sessions for the authenticated user."""
+    now = datetime.now(UTC)
+    stmt = (
+        select(RefreshToken)
+        .where(
+            RefreshToken.user_id == current_user.id,
+            RefreshToken.is_revoked.is_(False),
+            RefreshToken.expires_at > now,
+        )
+        .order_by(RefreshToken.created_at.desc())
+    )
+    res = await db.execute(stmt)
+    tokens = res.scalars().all()
+    return [
+        {
+            "session_id": str(t.id),
+            "family_id": str(t.family_id),
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+        }
+        for t in tokens
+    ]
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke a specific session",
+)
+async def revoke_session(
+    session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Revoke a specific active session."""
+    token = await db.get(RefreshToken, session_id)
+    if not token or token.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    token.is_revoked = True
+    await record_audit_log(
+        db=db,
+        action="SESSION_REVOKE",
+        resource_type="session",
+        resource_id=token.id,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+    )
+    await db.commit()
+
+
+@router.delete(
+    "/sessions",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke all sessions for current user",
+)
+async def revoke_all_sessions(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Revoke all active sessions for current user and clear browser cookies."""
+    stmt = select(RefreshToken).where(
+        RefreshToken.user_id == current_user.id,
+        RefreshToken.is_revoked.is_(False),
+    )
+    res = await db.execute(stmt)
+    tokens = res.scalars().all()
+    for t in tokens:
+        t.is_revoked = True
+
+    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    response.delete_cookie("access_token")
+
+    await record_audit_log(
+        db=db,
+        action="SESSION_REVOKE_ALL",
+        resource_type="session",
+        resource_id=current_user.id,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+    )
+    await db.commit()
+
