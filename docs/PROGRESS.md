@@ -352,6 +352,60 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-6-done
 
+---
+
+## Stage 7: Backup and Disaster Recovery   [PASSED]
+- Built:
+  - Database Backup & Client-Side Encryption Engine (`hub_backend/backup/backup.py` and `infra/backup/backup.py`):
+    - Full database dumps supporting PostgreSQL (`pg_dump -Fc`) and consistent SQLite snapshots via backup API
+    - Client-side authenticated encryption (AES-128-CBC + HMAC-SHA256 via Fernet) before writing to disk
+    - JSON manifest generation recording raw SHA-256, encrypted SHA-256, byte sizes, and timestamps
+    - Unencrypted raw dumps securely unlinked immediately after encryption
+    - Automated retention policy manager pruning old backup sets beyond retention quota (default 7 sets)
+  - Disaster Recovery Restoration Engine (`hub_backend/backup/restore.py` and `infra/backup/restore.py`):
+    - Integrity validation matching archive checksum against signed metadata before decryption
+    - Cryptographic decryption with automatic detection of tampered archives or mismatched KEKs
+    - Decrypted dump checksum verification prior to database reconstruction
+    - Post-restoration SQLite PRAGMA integrity check and sequence reconciliation
+  - Automated Scratch Restore Verification Service (`hub_backend/services/dr_verify.py`):
+    - Nightly/automated restore verification routine:
+      - Snapshots live database and generates encrypted archive
+      - Restores into an isolated scratch verification database
+      - Validates 100% record count match across core relational tables (`tenants`, `users`, `roles`, `nvrs`, `cameras`)
+      - Cleans up scratch database upon verification completion
+  - Production Shell Scripts (`infra/backup/backup.sh`, `infra/backup/restore.sh`):
+    - Bash wrappers for cron jobs, container orchestration, and manual operator disaster recovery
+  - Disaster Recovery Runbook (`docs/runbooks/dr-runbook.md`):
+    - Documented RTO (<15 minutes) and RPO (<1 hour) targets
+    - Detailed step-by-step incident playbooks for Hub database host loss, off-site recovery, and Edge Agent hardware replacement/re-enrolment
+- Tests:
+  - Hub: 67/67 tests passing (`pytest tests/ -v`)
+    - `test_backup_restore.py`: 6 tests (backup encryption and metadata generation, valid archive restoration and record fidelity, tampered archive rejection, wrong key rejection, retention pruning, automated scratch database restore and record checksum verification)
+    - Full regression suite for Stages 0 to 6 passing
+  - Agent: 51/51 tests passing (`pytest tests/ -v`)
+    - Full regression suite for Stages 0, 2, 3, 4, 5, 6 passing
+  - Frontend: 2/2 tests passing (`npm test -- --run`)
+  - Total test count: 120 total tests passing
+- Gate:
+  - Automated backup creates encrypted archive with cryptographic checksum: PASS
+  - Full restore proven by automated test with record count and checksum match: PASS
+  - Corrupted or tampered backup archive is detected and rejected: PASS
+  - Retention policy prunes expired backups cleanly: PASS
+  - DR runbook (`docs/runbooks/dr-runbook.md`) complete with RTO and RPO: PASS
+  - All linting and formatting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Moved backup/restore modules into `hub_backend/backup/` package to ensure native importability in tests and service layer
+  - Aligned table count queries in `dr_verify.py` with source database file rather than live session to ensure exact comparison
+  - Fixed unused variable warning in `dr_verify.py`
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - None
+- Known limitations:
+  - None
+- Commit/tag: stage-7-done
+
+
 
 
 
