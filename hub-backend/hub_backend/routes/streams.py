@@ -41,6 +41,7 @@ class StreamTokenResponse(BaseModel):
     target_path: str
     viewer_id: str
     expires_in_seconds: int = STREAM_TOKEN_LIFETIME_SECONDS
+    watermark: dict[str, Any] | None = None
 
 
 class StreamStopRequest(BaseModel):
@@ -94,6 +95,7 @@ async def get_stream_token(
         nvr=nvr,
         stream_type=stream_type,
         viewer_id=viewer_id,
+        user_id=current_user.id,
     )
 
     token = create_stream_token(
@@ -102,6 +104,14 @@ async def get_stream_token(
         tenant_id=current_user.tenant_id,
         stream_type=stream_type,
     )
+
+    from datetime import UTC, datetime
+
+    watermark_data = {
+        "enabled": True,
+        "text": f"{current_user.email} [{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}]",
+        "opacity": 0.35,
+    }
 
     await record_audit_log(
         db=db,
@@ -121,6 +131,7 @@ async def get_stream_token(
         target_path=session.target_path,
         viewer_id=viewer_id,
         expires_in_seconds=STREAM_TOKEN_LIFETIME_SECONDS,
+        watermark=watermark_data,
     )
 
 
@@ -186,6 +197,23 @@ async def mediamtx_auth_webhook(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Invalid agent credentials"
             )
 
+        # Enforce agent namespace isolation: agent can only publish to its own cameras
+        clean_name = clean_path.replace("live/", "")
+        parts = clean_name.split("_")
+        if parts:
+            try:
+                cam_id = uuid.UUID(parts[0])
+                cam = await db.get(Camera, cam_id)
+                if cam:
+                    nvr = await db.get(NVR, cam.nvr_id)
+                    if nvr and nvr.agent_id != agent.id:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Agent is not authorized to publish to this camera namespace",
+                        )
+            except (ValueError, TypeError):
+                pass
+
         return {"status": "ok"}
 
     if req.action == "read":
@@ -219,7 +247,10 @@ async def mediamtx_auth_webhook(
 
         return {"status": "ok"}
 
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported action")
+    # Deny by default
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: unsupported action"
+    )
 
 
 @router.get("/active", summary="List active stream sessions")

@@ -58,3 +58,26 @@ This file records the audit, fixes, test evidence, gate verification, and commit
   - 10/10 tests passing in `hub-backend/tests/test_stream_encryption.py`.
 - **Findings Report**: Documented in `docs/security/stage-S3-findings.md`.
 - **Commit**: `security-s3: Stream encryption and anti-replay complete`
+
+---
+
+## Stage S4: Stream Authorization and Namespace Isolation   [PASSED]
+- **Token Abuse Matrix**:
+  - Upgraded stream tokens with cryptographic `jti` and `session_id`.
+  - Built token revocation index (`revoke_stream_token`).
+  - Strict validation rejects expired, wrong-camera, wrong-tenant, forged, and revoked tokens.
+  - Client IP binding support.
+- **Publishing Namespace Isolation**:
+  - MediaMTX auth webhook confirms publishing agent owns the target camera's NVR.
+  - Cross-agent publish attempts fail closed with HTTP 403 Forbidden.
+- **Deny-by-Default Access Control**:
+  - Direct media access without token or with unsupported actions rejected with HTTP 403.
+- **Immediate Stream Revocation (< 3 seconds)**:
+  - `revoke_user_streams` immediately drops viewer sessions and terminates publishing workers in < 0.05 seconds.
+- **Concurrency Limits & Watermark**:
+  - Enforced `MAX_CONCURRENT_STREAMS_PER_USER` (HTTP 429 on breach).
+  - Dynamic watermark payload returned with user email and timestamp overlay.
+- **Tests**:
+  - 8/8 tests passing in `hub-backend/tests/test_stream_authorization.py`.
+- **Findings Report**: Documented in `docs/security/stage-S4-findings.md`.
+- **Commit**: `security-s4: Stream authorization and namespace isolation complete`

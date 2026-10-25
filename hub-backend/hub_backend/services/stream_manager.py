@@ -40,12 +40,16 @@ class ActiveStreamSession:
         self.stream_type = stream_type
         self.target_path = target_path
         self.viewers: set[str] = set()
+        self.viewer_users: dict[str, uuid.UUID] = {}
         self.started_at = datetime.now(UTC)
         self.grace_task: asyncio.Task[None] | None = None
 
     @property
     def viewer_count(self) -> int:
         return len(self.viewers)
+
+
+MAX_CONCURRENT_STREAMS_PER_USER = 6
 
 
 class StreamManager:
@@ -64,12 +68,21 @@ class StreamManager:
     def get_tenant_active_count(self, tenant_id: uuid.UUID) -> int:
         return sum(1 for s in self.active_streams.values() if s.tenant_id == tenant_id)
 
+    def get_user_active_count(self, user_id: uuid.UUID) -> int:
+        return sum(
+            1
+            for s in self.active_streams.values()
+            for u_id in s.viewer_users.values()
+            if u_id == user_id
+        )
+
     async def request_stream(
         self,
         camera: Camera,
         nvr: NVR,
         stream_type: str,
         viewer_id: str,
+        user_id: uuid.UUID | None = None,
     ) -> tuple[ActiveStreamSession, bool]:
         """Request a stream for a viewer.
 
@@ -79,6 +92,12 @@ class StreamManager:
         Returns:
             tuple[ActiveStreamSession, bool]: (session, was_newly_started)
         """
+        if user_id and self.get_user_active_count(user_id) >= MAX_CONCURRENT_STREAMS_PER_USER:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"User concurrent stream limit reached ({MAX_CONCURRENT_STREAMS_PER_USER} active streams)",
+            )
+
         stream_key = self.get_stream_key(camera.id, stream_type)
 
         async with self._lock:
@@ -90,6 +109,8 @@ class StreamManager:
                     log.info("stream_grace_period_aborted_new_viewer", stream_id=stream_key)
 
                 session.viewers.add(viewer_id)
+                if user_id:
+                    session.viewer_users[viewer_id] = user_id
                 log.info(
                     "stream_viewer_joined_fan_out",
                     stream_id=stream_key,
@@ -148,10 +169,41 @@ class StreamManager:
                 target_path=target_path,
             )
             session.viewers.add(viewer_id)
+            if user_id:
+                session.viewer_users[viewer_id] = user_id
             self.active_streams[stream_key] = session
 
             log.info("stream_started_on_demand", stream_id=stream_key, agent_id=str(nvr.agent_id))
             return session, True
+
+    async def revoke_user_streams(self, user_id: uuid.UUID) -> int:
+        """Immediately terminate all active streams for a user upon permission/scope revocation."""
+        revoked_count = 0
+        async with self._lock:
+            for key, session in list(self.active_streams.items()):
+                viewers_to_remove = [
+                    v_id for v_id, u_id in session.viewer_users.items() if u_id == user_id
+                ]
+                for v_id in viewers_to_remove:
+                    session.viewers.discard(v_id)
+                    session.viewer_users.pop(v_id, None)
+                    revoked_count += 1
+
+                if session.viewer_count == 0:
+                    if session.grace_task and not session.grace_task.done():
+                        session.grace_task.cancel()
+                    self.active_streams.pop(key, None)
+                    with contextlib.suppress(Exception):
+                        asyncio.create_task(
+                            agent_manager.send_command(
+                                agent_id=str(session.agent_id),
+                                command="stop_stream",
+                                payload={"stream_id": key},
+                                timeout_seconds=3,
+                            )
+                        )
+        log.info("user_streams_revoked_immediately", user_id=str(user_id), count=revoked_count)
+        return revoked_count
 
     async def leave_stream(
         self,
@@ -169,6 +221,7 @@ class StreamManager:
                 return
 
             session.viewers.discard(viewer_id)
+            session.viewer_users.pop(viewer_id, None)
             log.info(
                 "stream_viewer_left",
                 stream_id=stream_key,
