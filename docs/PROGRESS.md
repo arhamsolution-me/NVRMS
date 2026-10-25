@@ -577,6 +577,68 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-10-done
 
+---
+
+## Stage 11: Frontend Live Monitor and Dashboard   [PASSED]
+- Built:
+  - High-Performance VideoCell Player (`frontend/src/components/streaming/VideoCell.tsx`):
+    - HTML5 Video element stream container with automatic playback token negotiation (`POST /api/v1/streams/{cameraId}/token`)
+    - Dynamic stream quality switching: toggle seamlessly between high-definition Main stream and bandwidth-conserving Sub stream
+    - Real-time diagnostic telemetry HUD overlay displaying resolution, codec, FPS, bitrate (kbps), latency (ms), and frame drop counts
+    - Viewer lifecycle management: automated periodic heartbeats (`/api/v1/streams/{cameraId}/heartbeat`) and graceful teardown (`/api/v1/streams/{cameraId}/stop`) on cell unmount or camera change
+    - Player controls: audio mute/unmute, fullscreen mode, snapshot capture with PNG canvas export, and manual refresh
+    - Responsive placeholder states for idle cells, loading spinners, and error retries with user-friendly alerts
+  - Multi-Camera Live Monitor Grid (`frontend/src/pages/LiveMonitorPage.tsx`):
+    - Configurable multi-view layouts: 1x1 (single camera), 2x2 (quad view), 3x3 (9 cameras), and 4x4 (16 camera wall)
+    - Interactive Camera Directory drawer: browse online and offline cameras across locations, filtered by site or keyword search
+    - Cell slot targeting: drag/select camera from directory to place into any active grid cell
+    - Global grid controls: Clear All cells, Quick Layout selector, and active camera tally
+  - Operational Telemetry Dashboard (`frontend/src/pages/DashboardPage.tsx`):
+    - Real-time KPI metric cards: Active Streams, Connected Edge Agents, Discovered Cameras, and System Health Status
+    - Live Audit Event Activity feed: real-time streaming audit trail showing timestamped administrative events, actor badges, action types, and IP addresses
+    - User scope and role banner with quick navigation to live monitor and admin tools
+  - Comprehensive Audit Trail Viewer (`frontend/src/pages/AuditPage.tsx`):
+    - Centralized security and compliance log browser with pagination
+    - Filter by action type (`LOGIN_SUCCESS`, `NVR_PROBED`, `STREAM_STARTED`, `PERMISSION_TOGGLE`, `BACKUP_CREATED`, etc.) and keyword search across actor and resource
+    - JSON payload inspection modal rendering complete before/after audit context
+  - Disaster Recovery Settings Panel (`frontend/src/pages/SettingsPage.tsx`):
+    - Manual encrypted backup trigger (`POST /api/v1/backup/create`) generating authenticated Fernet archives
+    - Automated Scratch Restore Verification runner (`POST /api/v1/backup/verify`) testing backup fidelity and table integrity without touching production data
+    - Backup archive management table with raw SHA-256 and encrypted SHA-256 verification badges
+    - Retention policy configuration and RTO/RPO target status indicators
+- Tests:
+  - Frontend: 43/43 tests passing across 14 test suites (`npm test -- --run`):
+    - `video_cell.test.tsx`: 3 tests (stream token request, sub/main quality toggle, snapshot capture canvas export, viewer heartbeat and cleanup)
+    - `live_monitor.test.tsx`: 3 tests (2x2 quad default layout, switching 1x1, 2x2, 3x3, 4x4 grid modes, camera assignment to cell slots)
+    - `dashboard.test.tsx`: 2 tests (real-time metric card rendering, live audit event stream)
+    - `audit_settings.test.tsx`: 4 tests (audit logs table and action filter, JSON payload modal, trigger encrypted backup, run scratch restore verification)
+    - Full regression suite for Stages 9 and 10 passing
+  - Hub: 71/71 tests passing (`pytest tests/ -v`)
+  - Agent: 56/56 tests passing (`pytest tests/ -v`)
+  - Total test count: 170 total tests passing across full platform
+- Gate:
+  - Multi-camera live monitor supports 1x1, 2x2, 3x3, and 4x4 grids: PASS
+  - VideoCell handles token acquisition, quality toggle, telemetry HUD, and stop cleanup: PASS
+  - Snapshot capture generates downloadable image from video stream: PASS
+  - Dashboard renders operational telemetry and live audit stream: PASS
+  - Audit page provides searchable security logs with JSON detail modal: PASS
+  - Settings page triggers DR encrypted backup and scratch restore verification: PASS
+  - Production build bundle succeeds (`npm run build`): PASS
+  - All linting and formatting clean (`oxlint` on frontend, `ruff` on hub and agent): PASS
+- Issues found and fixed:
+  - Handled missing HTML5 canvas `getContext` in jsdom test environment gracefully
+  - Fixed TypeScript verbatimModuleSyntax type imports in `LiveMonitorPage.tsx`
+  - Disambiguated multiple element matches in audit/settings tests using `within(container)` and specific row test IDs
+  - Configured oxlint rules for React fast refresh and ref handling inside `useEffect`
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - Hardware accelerated H.264/H.265 video decoding on physical GPU (verified via HTML5 video element simulation and RTSP test streams)
+- Known limitations:
+  - None
+- Commit/tag: stage-11-done
+
+
 
 
 
