@@ -55,6 +55,7 @@ class AgentClient:
         heartbeat_interval: float = 30.0,
         base_delay: float = 1.0,
         max_delay: float = 60.0,
+        pinned_cert_fingerprint: str | None = None,
     ) -> None:
         self.agent_id = agent_id
         self.agent_token = agent_token
@@ -62,6 +63,7 @@ class AgentClient:
         self.heartbeat_interval = heartbeat_interval
         self.base_delay = base_delay
         self.max_delay = max_delay
+        self.pinned_cert_fingerprint = pinned_cert_fingerprint
         self._running = False
         self._connected = False
         self.ws: websockets.WebSocketClientProtocol | None = None  # type: ignore[name-defined]
@@ -160,6 +162,17 @@ class AgentClient:
             self.ws = ws
             self._connected = True
             log.info("agent_control_channel_established", agent_id=self.agent_id)
+
+            if self.pinned_cert_fingerprint and hasattr(ws, "transport") and ws.transport:
+                ssl_obj = ws.transport.get_extra_info("ssl_object")
+                if ssl_obj:
+                    der_cert = ssl_obj.getpeercert(binary_form=True)
+                    if der_cert:
+                        from agent.security.pinning import CertificatePinningVerifier
+
+                        CertificatePinningVerifier(self.pinned_cert_fingerprint).verify_cert_der(
+                            der_cert
+                        )
 
             from agent.resilience.time_sync import time_sync_manager
             from agent.streaming.manager import agent_stream_manager

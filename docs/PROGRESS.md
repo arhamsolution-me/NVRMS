@@ -296,6 +296,63 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-5-done
 
+---
+
+## Stage 6: Security Hardening   [PASSED]
+- Built:
+  - Security Headers & Request Protection Middleware:
+    - `SecurityHeadersMiddleware` (`hub_backend/security/headers.py`) mounted globally on FastAPI application:
+      - `Strict-Transport-Security: max-age=31536000; includeSubDomains` (HSTS)
+      - `X-Content-Type-Options: nosniff` (MIME sniffing prevention)
+      - `X-Frame-Options: DENY` (Clickjacking prevention)
+      - `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; object-src 'none'`
+      - `Referrer-Policy: strict-origin-when-cross-origin`
+      - `Permissions-Policy: geolocation=(), camera=(), microphone=()`
+    - Request payload size limiter rejecting request bodies larger than 10MB with HTTP 413
+  - Rate Limiting & Brute-Force Safeguards:
+    - Sliding-window rate limiter (`hub_backend/security/rate_limit.py`) with per-client tracking and `Retry-After` header responses
+    - Bound to sensitive authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/totp/verify`)
+  - Envelope Encryption for Stored Secrets:
+    - Two-tier KEK/DEK envelope encryption module (`hub_backend/security/envelope.py`)
+    - Generates unique per-secret Data Encrypting Keys (DEKs) using AES-256-GCM / Fernet, wrapping the DEK with the master Key Encrypting Key (KEK)
+    - Rejects tampered ciphertexts and invalid KEK keys
+  - Certificate Pinning on Edge Agent:
+    - `CertificatePinningVerifier` (`agent/security/pinning.py`) computing colon-normalized SHA-256 fingerprints of peer X.509 DER certificates
+    - Verified during WSS TLS handshake in `agent/client.py`; rejects MITM proxies and rogue CAs
+  - Security Documentation:
+    - Comprehensive STRIDE Threat Model (`docs/security/threat-model.md`) detailing assets, trust boundaries, threat scenarios, and defense-in-depth mitigations
+    - Security scan and dependency audit report (`docs/security/scan-report.md`) verifying 0 high or critical vulnerabilities across Python, TypeScript, and Docker stacks
+- Tests:
+  - Hub: 61/61 tests passing (`pytest tests/ -v`)
+    - `test_security_hardening.py`: 8 tests (security headers on all responses, oversized payload 413, rate limiter blocking burst abuse with 429 and Retry-After, envelope encryption roundtrip, tampered ciphertext rejection, mismatched KEK rejection, cross-tenant agent IDOR concealed 404, SQL injection query parameter sanitization)
+    - Full regression suite for Stages 0 to 5 passing
+  - Agent: 51/51 tests passing (`pytest tests/ -v`)
+    - `test_security_hardening.py`: 4 tests (matching fingerprint verification, mismatched MITM certificate rejection, disabled pinning bypass, colon/caps fingerprint normalization)
+    - Full regression suite for Stages 0, 2, 3, 4, 5 passing
+  - Frontend: 2/2 tests passing (`npm test -- --run`)
+  - Total test count: 114 total tests passing
+- Gate:
+  - All HTTP responses carry HSTS, CSP, X-Frame-Options, nosniff, and Referrer-Policy headers: PASS
+  - Rate limiter blocks brute force attempts with HTTP 429: PASS
+  - Cross-tenant IDOR attacks return 404 (concealed): PASS
+  - Certificate pinning in agent rejects mismatched TLS certificate fingerprints: PASS
+  - Envelope encryption protects stored credentials with DEK/KEK: PASS
+  - Threat model document (`docs/security/threat-model.md`) written: PASS
+  - Security scan report saved (`docs/security/scan-report.md`): PASS
+  - All linting and formatting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Added autouse rate limit reset fixture in `hub-backend/tests/conftest.py` to prevent cross-test rate limit collision during full test suite execution
+  - Fixed health check URL in security header tests from `/api/v1/health` to `/health`
+  - Replaced deprecated `HTTP_413_REQUEST_ENTITY_TOO_LARGE` with `HTTP_413_CONTENT_TOO_LARGE`
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - None
+- Known limitations:
+  - None
+- Commit/tag: stage-6-done
+
+
 
 
 

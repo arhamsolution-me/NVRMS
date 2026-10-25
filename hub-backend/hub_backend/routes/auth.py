@@ -16,6 +16,7 @@ from hub_backend.schemas.auth import (
     TOTPVerifyRequest,
     UserScopeSchema,
 )
+from hub_backend.security.rate_limit import rate_limit
 from hub_backend.security.rbac import get_current_user, get_role_permissions
 from hub_backend.security.totp import generate_totp_secret, get_totp_uri, verify_totp_code
 from hub_backend.services.audit import record_audit_log
@@ -25,7 +26,12 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 settings = get_settings()
 
 
-@router.post("/login", response_model=TokenResponse, summary="Log in with email and password")
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Log in with email and password",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60))],
+)
 async def login(
     req: LoginRequest,
     request: Request,
@@ -189,7 +195,12 @@ async def totp_setup(
     return TOTPSetupResponse(secret=secret, provisioning_uri=uri)
 
 
-@router.post("/totp/verify", status_code=status.HTTP_200_OK, summary="Verify code and enable 2FA")
+@router.post(
+    "/totp/verify",
+    status_code=status.HTTP_200_OK,
+    summary="Verify code and enable 2FA",
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60))],
+)
 async def totp_verify(
     req: TOTPVerifyRequest,
     current_user: User = Depends(get_current_user),

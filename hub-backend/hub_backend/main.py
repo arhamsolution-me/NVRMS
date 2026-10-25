@@ -58,6 +58,9 @@ def create_app() -> FastAPI:
     )
 
     # ── Middleware ─────────────────────────────────────────
+    from hub_backend.security.headers import SecurityHeadersMiddleware
+
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,

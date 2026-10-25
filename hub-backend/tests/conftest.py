@@ -134,3 +134,11 @@ def auth_header_factory():
         return {"Authorization": f"Bearer {token}"}
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits_between_tests() -> None:
+    """Reset sliding-window rate limits before each test run."""
+    from hub_backend.security.rate_limit import rate_limiter
+
+    rate_limiter.reset_all()
