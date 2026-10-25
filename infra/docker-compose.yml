@@ -126,6 +126,27 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── Hardened TURN / TURNS Server (coturn) ───────────────────
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    container_name: nvrsms-coturn
+    restart: unless-stopped
+    volumes:
+      - ./infra/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    environment:
+      TURN_SECRET: ${SECRET_KEY:?SECRET_KEY required}
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+      - "49152-49200:49152-49200/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_uclient -m 1 -c -u test -w test 127.0.0.1 || exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # ── Caddy Reverse Proxy ─────────────────────────────────────
   proxy:
     image: caddy:2-alpine

@@ -62,12 +62,12 @@ class DRVerificationService:
         source_clean = source_db_file.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
         is_uri = source_clean.startswith("file:") or "uri=true" in source_clean.lower()
         source_counts: dict[str, int] = {}
-        ALLOWED_TABLES = frozenset({"tenants", "users", "roles", "nvrs", "cameras"})
+        allowed_tables = frozenset({"tenants", "users", "roles", "nvrs", "cameras"})
         if not is_uri and os.path.exists(source_clean):
             s_conn = sqlite3.connect(source_clean)
             s_cur = s_conn.cursor()
             for table in ["tenants", "users", "roles", "nvrs", "cameras"]:
-                if table not in ALLOWED_TABLES:
+                if table not in allowed_tables:
                     continue
                 try:
                     s_cur.execute(f"SELECT count(*) FROM {table}")  # nosec B608
@@ -101,7 +101,7 @@ class DRVerificationService:
 
         restored_counts = {}
         for table in ["tenants", "users", "roles", "nvrs", "cameras"]:
-            if table not in ALLOWED_TABLES:
+            if table not in allowed_tables:
                 continue
             try:
                 cur.execute(f"SELECT count(*) FROM {table}")  # nosec B608

@@ -16,3 +16,26 @@ This file records the audit, fixes, test evidence, gate verification, and commit
 - **Secret Scan**: Verified 100% clean across full git history.
 - **Findings Report**: Documented in `docs/security/stage-S1-findings.md`.
 - **Commit**: `security-s1: Threat model and baseline audit complete`
+
+---
+
+## Stage S2: Transport Security Hardening   [PASSED]
+- **Internal CA & mTLS**:
+  - `InternalCA` (`hub_backend/security/ca.py`) generating ECDSA P-256 Root CA and issuing 90-day agent client certificates with `client_auth` extension.
+  - Server-side verification validates signature against Root CA, enforces validity dates, checks Common Name matching agent ID, and tracks serial revocations (CRL).
+- **Dual-Pin Certificate Pinning & Zero-Site-Visit Rotation**:
+  - `CertificatePinningVerifier` (`agent/security/pinning.py`) upgraded with dual primary and backup pin evaluation.
+  - Zero-site-visit rotation procedure documented in `docs/security/PIN_ROTATION.md`.
+- **Plaintext Transport Rejection**:
+  - `agent/client.py` strictly refuses unencrypted `http://` or `ws://` in production mode.
+- **coturn Hardening**:
+  - Created `infra/coturn/turnserver.conf` enforcing `use-auth-secret`, `no-multicast-peers`, private loopback/RFC1918 peer relay denial, and AEAD ciphers.
+  - Built time-limited HMAC-SHA1 session credential generator in `hub_backend/security/turn.py`.
+  - Added coturn container service to `infra/docker-compose.yml`.
+- **Ingress TLS 1.3 / 1.2-AEAD**:
+  - Configured `media/Caddyfile` with modern TLS parameters, HSTS with preload, and automatic HTTP-to-HTTPS redirect.
+- **Tests**:
+  - 14/14 tests passing in `hub-backend/tests/test_transport_security.py`.
+  - 4/4 tests passing in `agent/tests/test_security_hardening.py`.
+- **Findings Report**: Documented in `docs/security/stage-S2-findings.md`.
+- **Commit**: `security-s2: Transport security and mTLS complete`
