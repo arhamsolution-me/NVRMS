@@ -51,11 +51,21 @@ async def execute_command(command: str, payload: dict[str, Any]) -> dict[str, An
         }
 
     if command == "probe_nvr":
-        # Full implementation in Stage 3
-        return {
-            "status": "probe_ready",
-            "target": payload.get("ip"),
-        }
+        from agent.discovery.nvr_probe import probe_nvr as run_probe
+
+        target_ip = payload.get("ip", "")
+        port = int(payload.get("port", 554))
+        username = payload.get("username", "admin")
+        password = payload.get("password", "")
+        brand = payload.get("brand", "auto")
+
+        return await run_probe(
+            ip=target_ip,
+            port=port,
+            username=username,
+            password=password,
+            brand=brand,
+        )
 
     if command in ("start_stream", "stop_stream"):
         # Full implementation in Stage 4

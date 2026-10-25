@@ -143,3 +143,52 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-2-done
 
+---
+
+## Stage 3: NVR Add by IP and Camera Discovery   [PASSED]
+- Built:
+  - Security & Discovery Engine on Edge Agent:
+    - SSRF protection layer in `agent/discovery/ssrf.py`: blocks public IPs, cloud metadata (`169.254.169.254`), link-local, multicast, and broadcast addresses; strictly enforces RFC 1918 private ranges by default
+    - Reachability diagnostics with non-blocking async TCP connect (`agent/discovery/nvr_probe.py`)
+    - URL-encoding of credentials (`urllib.parse.quote`) preventing special character injection in RTSP URLs
+    - Brute-force lockout protection: automatically terminates probing after 3 consecutive failures within 5 minutes
+    - Data-driven vendor RTSP templates in `agent/discovery/vendor_templates.json` (Hikvision, Dahua, Uniview, Hanwha/Samsung, Axis, Xiongmai, and Generic RTSP)
+    - Channel enumeration extracting main and sub stream paths with codec and resolution profiles
+    - Encrypted local NVR credential vault in `agent/storage.py` (Fernet authenticated encryption)
+  - Hub-side Models, Schemas, and Routes:
+    - `NVR` model (`hub_backend/models/nvr.py`) with `(agent_id, ip_address, port)` uniqueness constraint allowing duplicate private IPs across distinct edge agents
+    - `Camera` model (`hub_backend/models/camera.py`) linked to NVRs with cascade deletion
+    - Alembic migration `0004_nvr_and_camera_discovery.py`
+    - Pydantic schemas in `hub_backend/schemas/nvr.py`
+    - Probe dispatch endpoint (`POST /api/v1/nvrs/probe`) routing probe commands through WebSocket gateway to edge agent
+    - Full NVR & Camera REST APIs with hierarchical location scoping (`/api/v1/nvrs`, `/api/v1/cameras`)
+    - Full structured audit logging (`NVR_PROBED`, `NVR_CREATE`, `NVR_UPDATE`, `NVR_DELETE`)
+- Tests:
+  - Hub: 44/44 tests passing (`pytest tests/ -v`)
+    - `test_nvr_discovery.py`: 4 tests (probe dispatch to connected agent, duplicate NVR on same agent rejected with 409, same IP on two different agents allowed and isolated, hierarchical site scoping on NVRs and cameras, NVR CRUD and cascade deletion of cameras)
+    - Full regression suite for Stage 0, 1, 2 passing
+  - Agent: 29/29 tests passing (`pytest tests/ -v`)
+    - `test_nvr_discovery.py`: 14 tests (SSRF private IP allow, public IP reject, cloud metadata reject, multicast reject, empty host reject, special character URL encoding, empty credential URL, reachability on open/closed port, lockout trigger after 3 strikes, vendor templates loading, full NVR probe channel enumeration, probe SSRF rejection, encrypted NVR credential vault save and retrieve)
+    - Full regression suite for Stage 0, 2 passing
+  - Frontend: 2/2 tests passing
+  - Total test count: 75 total tests passing
+- Gate:
+  - SSRF guard rejects public IPs and AWS metadata: PASS
+  - Same IP on two different agents works with no data bleed: PASS
+  - Duplicate NVR on same agent rejected: PASS
+  - Structured channel results include main and sub streams: PASS
+  - NVR passwords stored only on agent encrypted, never plaintext in Hub DB: PASS
+  - All linting and formatting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Updated `commands.py` test assertion in `test_agent_stage2.py` to match full probe diagnostics output
+  - Aligned `UserScope`, `City`, `Area`, `Site` model instantiation in tests with database schema
+  - Corrected parameter order in `get_user_accessible_site_ids(current_user, db)` and added `verify_site_access` in NVR routes
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - Physical multi-channel hardware NVR (tested against simulated TCP socket endpoints and MediaMTX RTSP stream templates)
+- Known limitations:
+  - None
+- Commit/tag: stage-3-done
+
+

@@ -72,8 +72,8 @@ class TestCommandProcessor:
         assert "devices" in reconcile_res
 
         probe_res = await execute_command("probe_nvr", {"ip": "192.168.1.100"})
-        assert probe_res["status"] == "probe_ready"
-        assert probe_res["target"] == "192.168.1.100"
+        assert "status" in probe_res
+        assert "diagnostics" in probe_res
 
         start_res = await execute_command("start_stream", {"stream_id": "s1"})
         assert start_res["status"] == "acknowledged"

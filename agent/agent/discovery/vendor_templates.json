@@ -1,0 +1,65 @@
+{
+  "hikvision": {
+    "name": "Hikvision",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 80,
+    "main_stream": "/Streaming/Channels/{channel}01",
+    "sub_stream": "/Streaming/Channels/{channel}02",
+    "snapshot": "/Streaming/Channels/{channel}01/picture"
+  },
+  "dahua": {
+    "name": "Dahua",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 80,
+    "main_stream": "/cam/realmonitor?channel={channel}&subtype=0",
+    "sub_stream": "/cam/realmonitor?channel={channel}&subtype=1",
+    "snapshot": "/cgi-bin/snapshot.cgi?channel={channel}"
+  },
+  "uniview": {
+    "name": "Uniview",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 80,
+    "main_stream": "/unicast/c{channel}/s0/live",
+    "sub_stream": "/unicast/c{channel}/s1/live",
+    "snapshot": "/images/c{channel}"
+  },
+  "hanwha": {
+    "name": "Hanwha / Samsung",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 80,
+    "main_stream": "/profile2/media.smp?channel={channel}",
+    "sub_stream": "/profile3/media.smp?channel={channel}",
+    "snapshot": "/stw-cgi/video.cgi?msubmenu=snapshot&action=view&channel={channel}"
+  },
+  "axis": {
+    "name": "Axis Communications",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 80,
+    "main_stream": "/axis-media/media.amp?camera={channel}&videocodec=h264",
+    "sub_stream": "/axis-media/media.amp?camera={channel}&videocodec=h264&resolution=640x360",
+    "snapshot": "/axis-cgi/jpg/image.cgi?camera={channel}"
+  },
+  "xiongmai": {
+    "name": "Xiongmai (XM / Netip)",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 8899,
+    "main_stream": "/user={username}_password={password}_channel={channel}_stream=0.sdp",
+    "sub_stream": "/user={username}_password={password}_channel={channel}_stream=1.sdp",
+    "snapshot": "/webcapture.jpg?command=snap&channel={channel}"
+  },
+  "generic": {
+    "name": "Generic RTSP",
+    "default_rtsp_port": 554,
+    "default_http_port": 80,
+    "default_onvif_port": 8080,
+    "main_stream": "/ch{channel}/main",
+    "sub_stream": "/ch{channel}/sub",
+    "snapshot": "/snapshot/ch{channel}.jpg"
+  }
+}

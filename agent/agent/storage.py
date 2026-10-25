@@ -74,3 +74,15 @@ class SecureStorage:
         """Wipe stored credentials."""
         if self.file_path.exists():
             self.file_path.unlink()
+
+    def save_nvr_credentials(self, nvr_id: str, creds: dict[str, Any]) -> None:
+        """Store encrypted credentials for an onboarded NVR."""
+        all_creds = self.load() or {}
+        nvrs = all_creds.setdefault("nvrs", {})
+        nvrs[nvr_id] = creds
+        self.save(all_creds)
+
+    def get_nvr_credentials(self, nvr_id: str) -> dict[str, Any] | None:
+        """Retrieve encrypted credentials for an NVR."""
+        all_creds = self.load() or {}
+        return all_creds.get("nvrs", {}).get(nvr_id)
