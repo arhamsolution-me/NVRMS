@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+# Security: non-root user
+RUN groupadd -r nvrsms && useradd -r -g nvrsms -d /app -s /sbin/nologin nvrsms
+
+# Install system deps (ffmpeg for stream workers, curl for health)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl wget gcc ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
+
+COPY . .
+
+RUN chown -R nvrsms:nvrsms /app
+
+USER nvrsms
+
+CMD ["python", "-m", "agent.main"]

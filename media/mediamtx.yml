@@ -1,0 +1,70 @@
+# MediaMTX configuration for NVRSMS development
+# Docs: https://github.com/bluenviron/mediamtx
+
+###############################################
+# General
+###############################################
+logLevel: info
+logDestinations: [stdout]
+
+# Disable metrics endpoint on a non-public port
+api: yes
+apiAddress: :9997
+
+###############################################
+# RTSP server
+###############################################
+rtsp: yes
+rtspAddress: :8554
+rtspEncryption: no
+protocols: [tcp]
+readTimeout: 10s
+writeTimeout: 10s
+
+###############################################
+# WebRTC / WHIP
+###############################################
+webrtc: yes
+webrtcAddress: :8889
+webrtcICEServers2: []
+
+###############################################
+# HLS (fallback)
+###############################################
+hls: yes
+hlsAddress: :8888
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+
+###############################################
+# External authentication hook (Stage 4+)
+###############################################
+# authMethod: http
+# authHTTPAddress: http://hub-backend:8000/api/v1/media/auth
+# Set to empty for Stage 0 (no auth required yet)
+authMethod: ""
+
+###############################################
+# Path defaults
+###############################################
+pathDefaults:
+  readPermission: yes
+  publishPermission: yes
+
+###############################################
+# Named paths
+###############################################
+paths:
+  # Simulator path (no auth in Stage 0)
+  sim/ch1:
+    source: publisher
+    readPermission: yes
+    publishPermission: yes
+
+  # Wildcard: all agent-published streams
+  # Pattern: agents/{agent_id}/{camera_id}
+  "~^agents/":
+    source: publisher
+    readPermission: yes
+    publishPermission: yes

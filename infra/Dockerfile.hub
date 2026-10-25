@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+# Security: non-root user
+RUN groupadd -r nvrsms && useradd -r -g nvrsms -d /app -s /sbin/nologin nvrsms
+
+# Install system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl wget gcc libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps first (layer cache)
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
+
+# Copy application
+COPY . .
+
+# Correct ownership
+RUN chown -R nvrsms:nvrsms /app
+
+USER nvrsms
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget -qO- http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "hub_backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

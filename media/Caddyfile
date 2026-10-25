@@ -1,0 +1,48 @@
+# Caddyfile — Development reverse proxy
+# For production: replace :80 with your domain and enable HTTPS
+
+:80 {
+    # Forward /health checks directly
+    handle /health {
+        reverse_proxy hub-backend:8000
+    }
+
+    # API and WebSocket
+    handle /api/* {
+        reverse_proxy hub-backend:8000
+    }
+
+    handle /ws/* {
+        reverse_proxy hub-backend:8000
+    }
+
+    # MediaMTX WebRTC / HLS
+    handle /whip/* {
+        reverse_proxy mediamtx:8889
+    }
+
+    handle /hls/* {
+        reverse_proxy mediamtx:8888
+    }
+
+    # Frontend (SPA)
+    handle {
+        reverse_proxy hub-backend:8000
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    encode gzip
+
+    log {
+        output stdout
+        format json
+    }
+}

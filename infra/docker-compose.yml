@@ -1,0 +1,157 @@
+version: "3.9"
+
+x-common-env: &common-env
+  TZ: UTC
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  # ── PostgreSQL 16 ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: nvrsms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nvrsms}
+      POSTGRES_USER: ${POSTGRES_USER:-nvrsms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nvrsms} -d ${POSTGRES_DB:-nvrsms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis 7 ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: nvrsms-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MediaMTX (RTSP / WebRTC relay) ─────────────────────────
+  mediamtx:
+    image: bluenviron/mediamtx:1.9.1
+    container_name: nvrsms-mediamtx
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      MTX_LOGLEVEL: info
+    volumes:
+      - ./media/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8554:8554"    # RTSP
+      - "8889:8889"    # WebRTC / WHIP
+      - "8888:8888"    # HLS
+      - "9997:9997"    # API
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9997/v3/paths/list || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── NVR Simulator (ffmpeg RTSP test pattern) ───────────────
+  nvr-sim:
+    image: linuxserver/ffmpeg:latest
+    container_name: nvrsms-nvr-sim
+    restart: unless-stopped
+    entrypoint: >
+      ffmpeg -re -f lavfi
+        -i "testsrc2=size=1280x720:rate=25,drawtext=fontsize=48:text='%{pts\\:hms}':x=10:y=10:fontcolor=white"
+        -f lavfi -i "sine=frequency=1000:sample_rate=44100"
+        -c:v libx264 -preset ultrafast -tune zerolatency
+        -b:v 512k -maxrate 512k -bufsize 1024k
+        -g 50 -c:a aac -b:a 64k
+        -f rtsp -rtsp_transport tcp
+        rtsp://mediamtx:8554/sim/ch1
+    depends_on:
+      mediamtx:
+        condition: service_healthy
+
+  # ── Hub Backend ─────────────────────────────────────────────
+  hub-backend:
+    build:
+      context: ./hub-backend
+      dockerfile: ../infra/Dockerfile.hub
+    container_name: nvrsms-hub
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      APP_ENV: ${APP_ENV:-development}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY required}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nvrsms}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nvrsms}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      MEDIAMTX_API_URL: http://mediamtx:9997
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@nvrsms.local}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD required}
+    volumes:
+      - ./hub-backend:/app:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Caddy Reverse Proxy ─────────────────────────────────────
+  proxy:
+    image: caddy:2-alpine
+    container_name: nvrsms-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./media/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - hub-backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  default:
+    name: nvrsms-network
