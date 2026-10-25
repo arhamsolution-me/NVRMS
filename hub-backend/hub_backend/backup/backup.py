@@ -31,7 +31,9 @@ class BackupEngine:
 
     def create_sqlite_dump(self, db_path: Path | str, output_path: Path | str) -> None:
         """Create a consistent SQLite dump using sqlite3 backup API."""
-        src_conn = sqlite3.connect(str(db_path))
+        path_str = str(db_path)
+        is_uri = path_str.startswith("file:") or "uri=true" in path_str.lower()
+        src_conn = sqlite3.connect(path_str, uri=is_uri)
         dst_conn = sqlite3.connect(str(output_path))
         with dst_conn:
             src_conn.backup(dst_conn)
@@ -67,8 +69,9 @@ class BackupEngine:
             clean_path = db_path_or_url.replace("sqlite+aiosqlite:///", "").replace(
                 "sqlite:///", ""
             )
-            if not os.path.exists(clean_path):
-                # In-memory or new SQLite: create clean snapshot
+            is_uri = clean_path.startswith("file:") or "uri=true" in clean_path.lower()
+            if not is_uri and not os.path.exists(clean_path):
+                # New SQLite: create clean snapshot
                 conn = sqlite3.connect(clean_path)
                 conn.execute("CREATE TABLE IF NOT EXISTS _nvrsms_dr_check (id INTEGER PRIMARY KEY)")
                 conn.commit()

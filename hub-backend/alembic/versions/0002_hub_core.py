@@ -7,15 +7,15 @@ Create Date: 2026-10-26
 
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0002"
-down_revision: Union[str, None] = "0001"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0001"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -35,7 +35,12 @@ def upgrade() -> None:
     op.create_table(
         "roles",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", sa.Uuid(as_uuid=True), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True),
+        sa.Column(
+            "tenant_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("tenants.id", ondelete="CASCADE"),
+            nullable=True,
+        ),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("is_system", sa.Boolean(), nullable=False, server_default=sa.text("false")),
@@ -62,8 +67,18 @@ def upgrade() -> None:
     op.create_table(
         "role_permissions",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("role_id", sa.Uuid(as_uuid=True), sa.ForeignKey("roles.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("permission_id", sa.Uuid(as_uuid=True), sa.ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "role_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("roles.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "permission_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("permissions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("is_granted", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -76,7 +91,12 @@ def upgrade() -> None:
     op.create_table(
         "provinces",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", sa.Uuid(as_uuid=True), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "tenant_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("tenants.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("code", sa.String(50), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -88,7 +108,12 @@ def upgrade() -> None:
     op.create_table(
         "cities",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("province_id", sa.Uuid(as_uuid=True), sa.ForeignKey("provinces.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "province_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("provinces.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("code", sa.String(50), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -100,7 +125,12 @@ def upgrade() -> None:
     op.create_table(
         "areas",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("city_id", sa.Uuid(as_uuid=True), sa.ForeignKey("cities.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "city_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("cities.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("code", sa.String(50), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -112,7 +142,12 @@ def upgrade() -> None:
     op.create_table(
         "sites",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("area_id", sa.Uuid(as_uuid=True), sa.ForeignKey("areas.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "area_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("areas.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(150), nullable=False),
         sa.Column("code", sa.String(50), nullable=False),
         sa.Column("address", sa.Text(), nullable=True),
@@ -127,14 +162,26 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", sa.Uuid(as_uuid=True), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "tenant_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("tenants.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("email", sa.String(255), nullable=False, unique=True),
         sa.Column("password_hash", sa.String(255), nullable=False),
         sa.Column("full_name", sa.String(150), nullable=False),
-        sa.Column("role_id", sa.Uuid(as_uuid=True), sa.ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column(
+            "role_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("roles.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("is_superuser", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("failed_login_attempts", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "failed_login_attempts", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
         sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column("totp_secret", sa.String(64), nullable=True),
         sa.Column("totp_enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
@@ -149,7 +196,12 @@ def upgrade() -> None:
     op.create_table(
         "user_scopes",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("scope_type", sa.String(20), nullable=False),
         sa.Column("scope_id", sa.Uuid(as_uuid=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -162,7 +214,12 @@ def upgrade() -> None:
     op.create_table(
         "refresh_tokens",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("token_hash", sa.String(128), nullable=False, unique=True),
         sa.Column("family_id", sa.Uuid(as_uuid=True), nullable=False),
         sa.Column("is_revoked", sa.Boolean(), nullable=False, server_default=sa.text("false")),
@@ -178,8 +235,18 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", sa.Uuid(as_uuid=True), sa.ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "tenant_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("tenants.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "user_id",
+            sa.Uuid(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("action", sa.String(100), nullable=False),
         sa.Column("resource_type", sa.String(50), nullable=False),
         sa.Column("resource_id", sa.String(100), nullable=True),

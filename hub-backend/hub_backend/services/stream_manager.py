@@ -258,5 +258,12 @@ class StreamManager:
             "restored_missing": restored_missing,
         }
 
+    def reset(self) -> None:
+        """Cancel any running grace tasks and clear active streams."""
+        for session in list(self.active_streams.values()):
+            if session.grace_task and not session.grace_task.done():
+                session.grace_task.cancel()
+        self.active_streams.clear()
+
 
 stream_manager = StreamManager()

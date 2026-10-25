@@ -60,3 +60,7 @@ alembic/__pycache__/
 hub-backend/dist/
 agent/dist/
 frontend/dist/
+
+# Backup archives
+backups/
+*.enc

@@ -57,6 +57,13 @@ async def test_engine():
     if not db_url.startswith("sqlite"):
         engine_kwargs["pool_pre_ping"] = True
 
+    hold_conn = None
+    if "mode=memory" in db_url:
+        import sqlite3
+
+        clean = db_url.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
+        hold_conn = sqlite3.connect(clean, uri=True)
+
     engine = create_async_engine(db_url, **engine_kwargs)
 
     async with engine.begin() as conn:
@@ -73,6 +80,8 @@ async def test_engine():
         await conn.run_sync(Base.metadata.drop_all)
     AsyncSessionLocal.configure(bind=default_engine)
     await engine.dispose()
+    if hold_conn:
+        hold_conn.close()
 
 
 @pytest.fixture
@@ -85,6 +94,16 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     )
     async with async_session() as session:
         yield session
+
+
+@pytest.fixture(autouse=True)
+def reset_singletons() -> Generator[None, None, None]:
+    """Reset in-memory singletons before and after each test."""
+    from hub_backend.services.stream_manager import stream_manager
+
+    stream_manager.reset()
+    yield
+    stream_manager.reset()
 
 
 @pytest.fixture

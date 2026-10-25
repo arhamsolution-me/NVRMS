@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
         agents_router,
         audit_router,
         auth_router,
+        backup_router,
         cameras_router,
         health_router,
         locations_router,
@@ -111,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(nvrs_router)
     app.include_router(cameras_router)
     app.include_router(streams_router)
+    app.include_router(backup_router)
 
     return app
 

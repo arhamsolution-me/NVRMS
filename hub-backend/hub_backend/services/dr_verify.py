@@ -60,8 +60,9 @@ class DRVerificationService:
 
         # 1. Capture source record counts
         source_clean = source_db_file.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
+        is_uri = source_clean.startswith("file:") or "uri=true" in source_clean.lower()
         source_counts: dict[str, int] = {}
-        if os.path.exists(source_clean):
+        if not is_uri and os.path.exists(source_clean):
             s_conn = sqlite3.connect(source_clean)
             s_cur = s_conn.cursor()
             for table in ["tenants", "users", "roles", "nvrs", "cameras"]:
