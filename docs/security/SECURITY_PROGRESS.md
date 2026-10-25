@@ -136,4 +136,30 @@ This file records the audit, fixes, test evidence, gate verification, and commit
 - **Findings Report**: Documented in `docs/security/stage-S6-findings.md`.
 - **Commit**: `security-s6: Agent hardening and adversarial harness complete`
 
+---
+
+## Stage S7: Data Protection and Infrastructure               [PASSED]
+- **Zero Plaintext Secrets at Rest**:
+  - Validated database dump: 0 plaintext passwords, tokens, or NVR credentials.
+  - Passwords: Argon2id hashes.
+  - Tokens & codes: SHA-256 hashes.
+  - NVR credentials: held exclusively on agents in encrypted local storage.
+- **Zero-Downtime Envelope Key Rotation**:
+  - Implemented multi-KEK fallback schedule (`EnvelopeEncryptor`).
+  - Active streaming and decrypt operations continue uninterrupted during key rotation.
+  - Seamless background DEK rewrapping (`rewrap_dek()`).
+- **Encrypted Backup & Restoration Verification**:
+  - Client-side authenticated Fernet encryption before backup leaves host.
+  - Restored SQLite database passes checksum validation and `PRAGMA integrity_check`.
+- **Cryptographic Audit Immutability & Tamper Detection**:
+  - Merkle-style SHA-256 hash chaining (`prev_hash` and `record_hash`) via migration 0005.
+  - Strictly monotonic timestamps ensure deterministic verification.
+  - Automated verifier (`verify_audit_log_chain`) detects modifications to historical rows.
+- **Tests**:
+  - 4/4 tests passing in `hub-backend/tests/test_data_protection.py`.
+  - Full platform backend suite: 121/121 passed. Full agent suite: 69/69 passed.
+- **Findings Report**: Documented in `docs/security/stage-S7-findings.md`.
+- **Commit**: `security-s7: Data protection and audit immutability complete`
+
+
 
