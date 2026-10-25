@@ -1,5 +1,6 @@
 """Models package exporting all SQLAlchemy entities."""
 
+from hub_backend.models.agent import Agent, AgentEnrolmentToken
 from hub_backend.models.audit import AuditLog
 from hub_backend.models.base import Base, UUIDModel
 from hub_backend.models.location import Area, City, Province, Site
@@ -22,4 +23,6 @@ __all__ = [
     "UserScope",
     "RefreshToken",
     "AuditLog",
+    "Agent",
+    "AgentEnrolmentToken",
 ]

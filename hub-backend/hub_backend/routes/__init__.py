@@ -1,5 +1,7 @@
 """Routes package exporting API routers."""
 
+from hub_backend.routes.agent_ws import router as agent_ws_router
+from hub_backend.routes.agents import router as agents_router
 from hub_backend.routes.audit import router as audit_router
 from hub_backend.routes.auth import router as auth_router
 from hub_backend.routes.health import router as health_router
@@ -16,4 +18,6 @@ __all__ = [
     "users_router",
     "audit_router",
     "ws_router",
+    "agents_router",
+    "agent_ws_router",
 ]

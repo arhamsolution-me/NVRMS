@@ -26,7 +26,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import hub_backend.models  # noqa: F401
-from hub_backend.db import Base, get_db
+from hub_backend.db import AsyncSessionLocal, Base, get_db
+from hub_backend.db import engine as default_engine
 from hub_backend.main import app
 from hub_backend.security.tokens import create_access_token
 from hub_backend.services.seed import seed_initial_data
@@ -61,7 +62,7 @@ async def test_engine():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Seed initial system data (roles, perms, super-admin)
+    AsyncSessionLocal.configure(bind=engine)
     async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         await seed_initial_data(session)
@@ -70,6 +71,7 @@ async def test_engine():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    AsyncSessionLocal.configure(bind=default_engine)
     await engine.dispose()
 
 

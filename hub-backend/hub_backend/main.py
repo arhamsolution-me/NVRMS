@@ -82,6 +82,8 @@ def create_app() -> FastAPI:
 
     # ── Routes ─────────────────────────────────────────────
     from hub_backend.routes import (  # noqa: PLC0415
+        agent_ws_router,
+        agents_router,
         audit_router,
         auth_router,
         health_router,
@@ -98,6 +100,8 @@ def create_app() -> FastAPI:
     app.include_router(users_router)
     app.include_router(audit_router)
     app.include_router(ws_router)
+    app.include_router(agents_router)
+    app.include_router(agent_ws_router)
 
     return app
 

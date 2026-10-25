@@ -96,3 +96,50 @@ This file is appended after each completed stage.
 - Known limitations:
   - None
 - Commit/tag: stage-1-done
+
+---
+
+## Stage 2: Agent Enrolment and Control Channel   [PASSED]
+- Built:
+  - Hub-side Agent Management:
+    - `Agent` and `AgentEnrolmentToken` entities in `hub_backend/models/agent.py`
+    - Alembic migration `0003_agent_enrolment.py`
+    - Single-use 15-minute enrolment token generation (`POST /api/v1/agents/enrol-token`) and exchange endpoint (`POST /api/v1/agents/enrol`)
+    - Agent REST API in `hub_backend/routes/agents.py`: list with filters, detail, rotate credentials, revoke, dispatch command
+    - Outbound WebSocket gateway `/ws/agent` with authentication, connection tracking, duplicate connection arbitration, and heartbeat update in `hub_backend/routes/agent_ws.py`
+    - Connection and command dispatcher manager in `hub_backend/services/agent_manager.py` with strict command whitelist (`ping`, `get_status`, `probe_nvr`, `start_stream`, `stop_stream`, `reconcile_state`)
+  - Edge Agent Implementation (`agent/`):
+    - Encrypted local credential storage using `cryptography.fernet.Fernet` (`agent/storage.py`)
+    - Autonomous enrolment client (`enrol_agent` in `agent/client.py`)
+    - Persistent WSS client with exponential backoff and jitter (`AgentClient` in `agent/client.py`)
+    - Heartbeat background loop (30s default) with heartbeat_ack handling
+    - Command processor with whitelist validation, error isolation, and acknowledgement dispatch (`agent/commands.py`)
+    - State reconciliation message reporting active streams and devices upon connect
+- Tests:
+  - Hub: 40/40 tests passing (`pytest tests/ -v`)
+    - `test_agent_lifecycle.py`: 10 tests (enrolment token generation/consumption, expired token rejection, invalid token rejection, command whitelist enforcement, offline agent 503, credential rotation, revocation status, list/detail endpoints, websocket auth rejections [4001, 4003], gateway lifecycle [heartbeat + reconcile], duplicate connection drop [4002], roundtrip command execution)
+    - All Stage 0 and Stage 1 regression tests passing
+  - Agent: 15/15 tests passing (`pytest tests/ -v`)
+    - `test_agent_stage0.py`: 5 tests
+    - `test_agent_stage2.py`: 10 tests (secure storage save/load/clear, ciphertext tampering detection, whitelisted commands execute, non-whitelisted commands rejected, exponential backoff with jitter bounds, ws URL formatting, enrolment success/failure, command execution dispatch via ws, heartbeat sender loop)
+  - Frontend: 2/2 tests passing
+  - Total test count: 57 total tests passing
+- Gate:
+  - Agent enrols with single-use code; code cannot be reused or used after 15m: PASS
+  - Connected agent stays connected with heartbeats: PASS
+  - Revoking an agent disconnects live WebSocket connection immediately and blocks reconnect: PASS
+  - Duplicate connection with same agent ID drops previous connection cleanly: PASS
+  - Non-whitelisted commands are rejected: PASS
+  - All linting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Configured `AsyncSessionLocal` to bind to `test_engine` during test sessions to unify in-memory database across background WebSocket gateways and HTTP handlers
+  - Fixed command envelope identifier key matching (`command_id`) in round-trip command test
+  - Replaced `asyncio.suppress` with standard `contextlib.suppress`
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - Physical edge device (tested via automated mock WebSocket protocol and local async agents)
+- Known limitations:
+  - None
+- Commit/tag: stage-2-done
+
