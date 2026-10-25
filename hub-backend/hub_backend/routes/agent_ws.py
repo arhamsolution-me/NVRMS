@@ -15,6 +15,7 @@ from hub_backend.logging_config import get_logger
 from hub_backend.models.agent import Agent
 from hub_backend.security.tokens import hash_token
 from hub_backend.services.agent_manager import agent_manager
+from hub_backend.services.stream_manager import stream_manager
 
 log = get_logger(__name__)
 router = APIRouter(tags=["agent_ws"])
@@ -107,7 +108,18 @@ async def agent_websocket_gateway(
 
             elif msg_type == "reconciliation":
                 # Agent state sync upon connect
-                log.info("agent_state_reconciled", agent_id=agent_id, payload=data.get("payload"))
+                payload = data.get("payload", {})
+                reported_streams = payload.get("active_streams", [])
+                reconciled = await stream_manager.reconcile_agent_streams(
+                    agent_uuid, reported_streams
+                )
+                log.info(
+                    "agent_state_reconciled",
+                    agent_id=agent_id,
+                    reported_streams=len(reported_streams),
+                    stopped_orphans=len(reconciled["stopped_orphans"]),
+                    restored_missing=len(reconciled["restored_missing"]),
+                )
 
     except WebSocketDisconnect:
         log.info("agent_gateway_disconnected", agent_id=agent_id)

@@ -36,6 +36,11 @@ class StreamWorker:
         self._supervisor_task: asyncio.Task[None] | None = None
         self.last_packet_time = time.time()
         self.restart_count = 0
+        self.stall_timeout = 15.0
+        self.max_crashes_in_window = 5
+        self.crash_window_seconds = 60.0
+        self.crash_timestamps: list[float] = []
+        self.is_circuit_broken = False
 
     @property
     def is_alive(self) -> bool:
@@ -113,13 +118,19 @@ class StreamWorker:
                 # Monitor stderr for activity and stall detection
                 while self._running and self._proc.returncode is None:
                     try:
-                        line = await asyncio.wait_for(self._proc.stderr.readline(), timeout=15.0)  # type: ignore[union-attr]
+                        line = await asyncio.wait_for(
+                            self._proc.stderr.readline(),
+                            timeout=self.stall_timeout,  # type: ignore[union-attr]
+                        )
                         if not line:
                             break
                         self.last_packet_time = time.time()
                     except TimeoutError:
-                        # Stalled stream check
+                        # Stalled stream detected by watchdog
                         log.warning("stream_watchdog_timeout_stalled", stream_id=self.stream_id)
+                        if self._proc and self._proc.returncode is None:
+                            with contextlib.suppress(Exception):
+                                self._proc.kill()
                         break
 
                 await self._proc.wait()
@@ -136,6 +147,21 @@ class StreamWorker:
                 log.warning("ffmpeg_supervisor_error", stream_id=self.stream_id, error=str(exc))
 
             if not self._running:
+                break
+
+            now = time.time()
+            self.crash_timestamps = [
+                t for t in self.crash_timestamps if now - t <= self.crash_window_seconds
+            ]
+            self.crash_timestamps.append(now)
+
+            if len(self.crash_timestamps) >= self.max_crashes_in_window:
+                self.is_circuit_broken = True
+                log.error(
+                    "stream_worker_crash_loop_circuit_broken",
+                    stream_id=self.stream_id,
+                    crashes=len(self.crash_timestamps),
+                )
                 break
 
             self.restart_count += 1

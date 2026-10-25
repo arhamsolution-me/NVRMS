@@ -250,5 +250,52 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-4-done
 
+---
+
+## Stage 5: Resilience Layer   [PASSED]
+- Built:
+  - Failure Matrix Implementation (System Spec Section 12):
+    - Row 1 (Hub Connection Loss / Network Flap): Outbound WSS auto-reconnection loop in `agent/client.py` with exponential backoff and randomized jitter (1s to 60s); proven resilient against socket drops.
+    - Row 2 (State Drift on Reconnection): Bidirectional state reconciliation protocol in `agent/client.py`, `hub_backend/routes/agent_ws.py`, and `hub_backend/services/stream_manager.py`. Agent transmits active running streams on connect; Hub automatically reconciles against desired viewer state, terminating orphaned pulls and flagging missing streams.
+    - Row 3 (Process Crash / FFmpeg Death): Process supervisor in `StreamWorker` (`agent/streaming/worker.py`) with automatic restart and crash-loop circuit breaker (trips if >= 5 crashes within 60 seconds to halt CPU thrashing).
+    - Row 4 (Frozen Stream / Stalled Frames): Watchdog in `StreamWorker` monitoring stderr and frame packet activity with configurable timeout (15s); immediately terminates hung ffmpeg subprocesses and initiates supervisor recovery.
+    - Row 5 (Auth Failure / Credential Revocation): Retry-storm prevention in `agent/client.py`. When connection encounters 4001 (unauthorized) or 4003 (forbidden/revoked), agent enters long exponential backoff (up to 300s) instead of tight looping, preventing DDoS/thundering herd storms against Hub during credential rotation or mass token expiration.
+    - Row 6 (Low Uplink Bandwidth / Congestion): Adaptive quality monitor in `agent/resilience/network_monitor.py`. Tracks packet loss and RTT; automatically recommends degradation from main stream to sub stream when uplink degrades (>5% loss or >400ms RTT) and restores main stream after 3 consecutive clean sample intervals.
+    - Row 7 (Disk Exhaustion / Log Accumulation): Disk threshold monitor and bounded FIFO log pruning in `agent/resilience/disk_monitor.py`. Checks disk usage and automatically prunes oldest `.log` files when free disk drops below safety threshold or file count exceeds safety limits.
+    - Row 8 (Corrupted / Failed Self-Update): Cryptographic OTA updater in `agent/resilience/updater.py`. Enforces SHA-256 integrity and HMAC-SHA256 signature verification prior to staging; creates pre-update backup of binary/component; executes post-update boot health checks; automatically triggers instant atomic rollback to backup if health check fails.
+    - Row 9 (Hardware Clock Skew / RTC Drift): Time synchronization manager in `agent/resilience/time_sync.py`. Compares Agent local UTC clock with Hub server timestamps on handshakes and heartbeats; detects drift exceeding 15 seconds; logs warning and applies offset compensation across all outgoing timestamps.
+- Tests:
+  - Hub: 53/53 tests passing (`pytest tests/ -v`)
+    - `test_resilience.py`: 3 tests (reconciliation cleans orphaned streams, reconciliation detects missing stream, abrupt agent disconnect marks agent offline)
+    - Full regression suite for Stage 0, 1, 2, 3, 4 passing
+  - Agent: 47/47 tests passing (`pytest tests/ -v`)
+    - `test_resilience.py`: 14 tests (clock drift detection and compensation, disk usage and FIFO log pruning, updater success flow, tampered package checksum rejection, signature mismatch rejection, post-update failure automatic rollback, low-uplink adaptive stream degradation and streak recovery, watchdog stall kill, crash-loop circuit breaker, jitter bounds, command execution)
+    - Full regression suite for Stage 0, 2, 3, 4 passing
+  - Frontend: 2/2 tests passing (`npm test -- --run`)
+  - Total test count: 102 total tests passing
+- Gate:
+  - Every row of the failure matrix (1-9) has an automated passing test: PASS
+  - Reconnection with jitter and backoff proven: PASS
+  - State reconciliation cleans orphaned streams and restores missing streams: PASS
+  - Process supervisor and watchdog prevent orphan/hung processes: PASS
+  - Auth rejection enters backoff freeze preventing retry storms: PASS
+  - Disk monitor prunes bounded log FIFO: PASS
+  - Signature-verified updater rolls back on failed verification: PASS
+  - Time drift > 15s is detected and compensated: PASS
+  - All linting and formatting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Added `list_active_streams` alias on `AgentStreamManager` to align with command processor
+  - Handled coroutine mock warnings on `mock_proc.kill` and `mock_proc.terminate` in tests
+  - Added session refresh in database disconnect test to properly reload state across async sessions
+  - Fixed syntax in `stream_manager.py` cancel exception handler
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - Hardware RTC battery failure (simulated with local time offset comparison in `test_resilience.py`)
+- Known limitations:
+  - None
+- Commit/tag: stage-5-done
+
+
 
 

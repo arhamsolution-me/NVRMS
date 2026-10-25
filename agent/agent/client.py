@@ -139,7 +139,12 @@ class AgentClient:
             await ws.send(json.dumps(response))
 
         elif msg_type == "heartbeat_ack":
-            log.debug("agent_heartbeat_ack_received", timestamp=msg.get("timestamp"))
+            ts = msg.get("timestamp")
+            if ts:
+                from agent.resilience.time_sync import time_sync_manager
+
+                time_sync_manager.sync_with_server(ts)
+            log.debug("agent_heartbeat_ack_received", timestamp=ts)
 
     async def connect_once(self) -> None:
         """Establish one connection session and process messages until closed."""
@@ -156,12 +161,17 @@ class AgentClient:
             self._connected = True
             log.info("agent_control_channel_established", agent_id=self.agent_id)
 
+            from agent.resilience.time_sync import time_sync_manager
+            from agent.streaming.manager import agent_stream_manager
+
+            active_streams = agent_stream_manager.list_active_streams()
+
             # Send initial state reconciliation
             reconcile_msg = {
                 "type": "reconciliation",
                 "agent_id": self.agent_id,
-                "payload": {"active_streams": [], "devices": []},
-                "timestamp": datetime.now(UTC).isoformat(),
+                "payload": {"active_streams": active_streams, "devices": []},
+                "timestamp": time_sync_manager.get_compensated_iso(),
             }
             await ws.send(json.dumps(reconcile_msg))
 
@@ -181,16 +191,33 @@ class AgentClient:
         """Persistent connection loop with backoff and reconnection."""
         self._running = True
         attempt = 0
+        auth_failures = 0
 
         while self._running:
             try:
                 await self.connect_once()
                 attempt = 0  # Reset backoff on clean connection
+                auth_failures = 0
             except ConnectionClosed as exc:
                 if exc.code == 4003:
                     log.error("agent_revoked_by_hub_halting", agent_id=self.agent_id)
                     self._running = False
                     break
+                if exc.code == 4001:
+                    auth_failures += 1
+                    # Retry-storm prevention on auth failure: back off significantly (up to 300s)
+                    auth_delay = min(300.0, 30.0 * (2 ** min(auth_failures, 4))) + random.uniform(
+                        0, 2.0
+                    )
+                    log.warning(
+                        "agent_auth_failed_retry_storm_prevention",
+                        agent_id=self.agent_id,
+                        backoff_seconds=round(auth_delay, 2),
+                        auth_failures=auth_failures,
+                    )
+                    await asyncio.sleep(auth_delay)
+                    continue
+
                 log.warning("agent_connection_closed", code=exc.code, reason=exc.reason)
             except Exception as exc:
                 log.warning("agent_connection_error", error=str(exc))

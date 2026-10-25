@@ -203,5 +203,60 @@ class StreamManager:
         except asyncio.CancelledError:
             pass
 
+    async def reconcile_agent_streams(
+        self,
+        agent_id: uuid.UUID,
+        reported_streams: list[str],
+    ) -> dict[str, list[str]]:
+        """Reconcile reported agent streams with Hub desired streams.
+
+        - Orphan streams on agent (Hub has 0 viewers or no session) -> send stop_stream.
+        - Missing streams on agent (Hub has active session with viewers) -> re-issue start_stream.
+        """
+        stopped_orphans: list[str] = []
+        restored_missing: list[str] = []
+
+        async with self._lock:
+            # Active streams managed by Hub for this agent with active viewers
+            hub_sessions = {
+                key: s
+                for key, s in self.active_streams.items()
+                if s.agent_id == agent_id and s.viewer_count > 0
+            }
+
+        # 1. Detect orphans: reported by agent, but Hub does not expect them
+        for stream_id in reported_streams:
+            if stream_id not in hub_sessions:
+                stopped_orphans.append(stream_id)
+                with contextlib.suppress(Exception):
+                    asyncio.create_task(
+                        agent_manager.send_command(
+                            agent_id=str(agent_id),
+                            command="stop_stream",
+                            payload={"stream_id": stream_id},
+                            timeout_seconds=5,
+                        )
+                    )
+                log.info(
+                    "reconciliation_stopping_orphan_stream",
+                    stream_id=stream_id,
+                    agent_id=str(agent_id),
+                )
+
+        # 2. Detect missing streams: Hub has active viewers, but agent is not streaming it
+        for key in hub_sessions:
+            if key not in reported_streams:
+                restored_missing.append(key)
+                log.info(
+                    "reconciliation_detected_missing_stream",
+                    stream_id=key,
+                    agent_id=str(agent_id),
+                )
+
+        return {
+            "stopped_orphans": stopped_orphans,
+            "restored_missing": restored_missing,
+        }
+
 
 stream_manager = StreamManager()

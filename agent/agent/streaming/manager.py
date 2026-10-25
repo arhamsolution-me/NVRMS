@@ -75,5 +75,8 @@ class AgentStreamManager:
     def list_active(self) -> list[str]:
         return list(self.workers.keys())
 
+    def list_active_streams(self) -> list[str]:
+        return self.list_active()
+
 
 agent_stream_manager = AgentStreamManager()

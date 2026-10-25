@@ -20,6 +20,10 @@ COMMAND_WHITELIST: frozenset[str] = frozenset(
         "start_stream",
         "stop_stream",
         "reconcile_state",
+        "check_disk",
+        "sync_time",
+        "apply_update",
+        "check_network",
     ]
 )
 
@@ -44,10 +48,13 @@ async def execute_command(command: str, payload: dict[str, Any]) -> dict[str, An
         }
 
     if command == "reconcile_state":
+        from agent.resilience.time_sync import time_sync_manager
+        from agent.streaming.manager import agent_stream_manager
+
         return {
-            "active_streams": [],
+            "active_streams": agent_stream_manager.list_active_streams(),
             "devices": [],
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": time_sync_manager.get_compensated_iso(),
         }
 
     if command == "probe_nvr":
@@ -84,5 +91,44 @@ async def execute_command(command: str, payload: dict[str, Any]) -> dict[str, An
         return await agent_stream_manager.stop_stream(
             stream_id=payload.get("stream_id", ""),
         )
+
+    if command == "check_disk":
+        from agent.resilience.disk_monitor import disk_monitor
+
+        target_path = payload.get("path", ".")
+        prune = payload.get("prune", False)
+        stats = disk_monitor.get_disk_stats(target_path)
+        pruned = []
+        if prune:
+            pruned = disk_monitor.prune_old_logs(target_path, force=True)
+        return {"stats": stats, "pruned": pruned}
+
+    if command == "sync_time":
+        from agent.resilience.time_sync import time_sync_manager
+
+        server_ts = payload.get("server_timestamp", datetime.now(UTC).isoformat())
+        skew = time_sync_manager.sync_with_server(server_ts)
+        return {
+            "skew_seconds": skew,
+            "is_skewed": time_sync_manager.is_skewed,
+            "compensated_iso": time_sync_manager.get_compensated_iso(),
+        }
+
+    if command == "apply_update":
+        from agent.resilience.updater import agent_updater
+
+        return agent_updater.apply_update(
+            current_file=payload.get("current_file", ""),
+            new_package=payload.get("new_package", ""),
+            expected_sha256=payload.get("expected_sha256", ""),
+            signature=payload.get("signature", ""),
+        )
+
+    if command == "check_network":
+        from agent.resilience.network_monitor import network_monitor
+
+        packet_loss = float(payload.get("packet_loss_pct", 0.0))
+        rtt = float(payload.get("rtt_ms", 20.0))
+        return network_monitor.evaluate_metrics(packet_loss_pct=packet_loss, rtt_ms=rtt)
 
     raise ValueError(f"Unhandled command: {command}")
