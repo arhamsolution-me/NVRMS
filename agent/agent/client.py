@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
+import secrets
 from datetime import UTC, datetime
 from typing import Any
 
@@ -80,7 +80,7 @@ class AgentClient:
     def compute_backoff(self, attempt: int) -> float:
         """Compute exponential backoff with +/- 25% jitter."""
         exp_delay = min(self.max_delay, self.base_delay * (2 ** min(attempt, 6)))
-        jitter = random.uniform(-0.25, 0.25) * exp_delay
+        jitter = secrets.SystemRandom().uniform(-0.25, 0.25) * exp_delay
         return max(self.base_delay, exp_delay + jitter)
 
     async def _heartbeat_loop(self, ws: websockets.WebSocketClientProtocol) -> None:  # type: ignore[name-defined]
@@ -219,7 +219,7 @@ class AgentClient:
                 if exc.code == 4001:
                     auth_failures += 1
                     # Retry-storm prevention on auth failure: back off significantly (up to 300s)
-                    auth_delay = min(300.0, 30.0 * (2 ** min(auth_failures, 4))) + random.uniform(
+                    auth_delay = min(300.0, 30.0 * (2 ** min(auth_failures, 4))) + secrets.SystemRandom().uniform(
                         0, 2.0
                     )
                     log.warning(

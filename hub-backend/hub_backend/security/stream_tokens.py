@@ -6,7 +6,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from hub_backend.config import get_settings
 
@@ -51,7 +52,7 @@ def verify_stream_token(token: str) -> dict[str, Any]:
             settings.secret_key.get_secret_value(),
             algorithms=[settings.jwt_algorithm],
         )
-    except JWTError as exc:
+    except (PyJWTError, Exception) as exc:
         raise ValueError(f"Invalid or expired stream token: {exc}") from exc
 
     if payload.get("token_type") != "stream_playback":

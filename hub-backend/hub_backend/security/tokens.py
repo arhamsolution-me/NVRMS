@@ -8,7 +8,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
 
 from hub_backend.config import get_settings
@@ -70,7 +71,7 @@ def decode_access_token(token: str) -> TokenPayload | None:
         if payload.get("token_type") != "access":
             return None
         return TokenPayload(**payload)
-    except (JWTError, Exception):
+    except (PyJWTError, Exception):
         return None
 
 
