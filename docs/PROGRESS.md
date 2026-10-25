@@ -520,6 +520,64 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-9-done
 
+---
+
+## Stage 10: Frontend Admin Modules   [PASSED]
+- Built:
+  - Locations Hierarchy Manager (`frontend/src/pages/LocationsPage.tsx`):
+    - Full 4-level interactive tree: Province -> City -> Area -> Site with real-time expand/collapse and live text search
+    - Dynamic Add modals supporting creation of Provinces, Cities (scoped to province), Areas (scoped to city), and Sites (with physical address)
+    - Node selection pane displaying hierarchical inheritance paths, unique UUIDs, and scoped access policies
+    - Safe deletion workflow with confirmation and cascade removal
+  - Users & Scopes Management (`frontend/src/pages/UsersPage.tsx`):
+    - Comprehensive directory table rendering full names, emails, assigned roles, active status badges, 2FA status, and scoped area tallies
+    - User provisioning and edit modal supporting email, full name, secure password, role dropdown selection, and active toggle
+    - Last super admin lockout safeguard preventing demotion or deletion of the last remaining root administrator
+  - Roles & RBAC Matrix Engine (`frontend/src/pages/RolesPage.tsx`):
+    - Roles management panel displaying system roles (immutable) and custom organization roles
+    - Dynamic Permission Matrix grouped by domain: CAMERAS, STREAMS, LOCATIONS, USERS, ROLES, AUDIT, SETTINGS
+    - Real-time permission toggle switches with optimistic UI updates and instant Redis cache invalidation (`PUT /api/v1/roles/{id}/permissions`)
+    - Custom role creation dialog with name and description
+  - NVR & Camera Discovery (`frontend/src/pages/DevicesPage.tsx`):
+    - NVR inventory list displaying device names, SSRF-guarded IP addresses, hardware vendor tags (Hikvision, Dahua, Uniview, Generic), port mappings, and channel counts
+    - "Onboard NVR by IP" modal featuring live Discovery Probe (`POST /api/v1/nvrs/probe`) triggering edge agent reachability checks and RTSP channel enumeration before database commitment
+    - Interactive Camera Channel Drawer showing discovered channels, PTZ capabilities, and stream definitions
+  - Edge Agent Fleet Manager (`frontend/src/pages/AgentsPage.tsx`):
+    - Agent fleet dashboard displaying connection status (connected, degraded, disconnected), agent versions, site bindings, and live heartbeat telemetry
+    - Cryptographic Enrolment Code Generator producing single-use, 15-minute expiring codes (`ENROL-XXXX-YYYY`) with copy-to-clipboard functionality
+    - Real-time Hardware Diagnostics Modal: dispatches `get_diagnostics` command to edge agent and renders host OS specs, CPU core counts, disk utilization, clock drift skew offset, active RTSP stream pipelines, and redacted runtime configs
+- Tests:
+  - Frontend: 31/31 tests passing across 10 test suites (`npm test -- --run`):
+    - `locations.test.tsx`: 3 tests (tree hierarchy rendering, modal province creation, live search filtering)
+    - `users.test.tsx`: 2 tests (user directory rendering, modal user account provisioning)
+    - `roles.test.tsx`: 2 tests (role list and matrix rendering, optimistic permission toggle and PUT dispatch)
+    - `devices.test.tsx`: 2 tests (NVR list and camera channels rendering, active probe test)
+    - `agents.test.tsx`: 3 tests (fleet table rendering, enrolment code generation, diagnostics modal)
+    - Full regression suite for Stage 9 (client, guards, auth, navigation, App) passing
+  - Hub: 71/71 tests passing (`pytest tests/ -v`)
+  - Agent: 56/56 tests passing (`pytest tests/ -v`)
+  - Total test count: 158 total tests passing across full platform
+- Gate:
+  - Locations hierarchy tree supports full 4-level navigation and CRUD: PASS
+  - Users page handles account provisioning, role assignment, and location scoping: PASS
+  - Roles page features dynamic permission matrix with instant cache invalidation: PASS
+  - Devices page onboards NVRs by IP with active agent discovery probe: PASS
+  - Agents page generates single-use enrolment codes and displays sanitized diagnostics: PASS
+  - Production build bundle succeeds (`npm run build` in 727ms): PASS
+  - All linting clean (`oxlint` on frontend, `ruff` on hub and agent): PASS
+- Issues found and fixed:
+  - Configured tree initial expansion to open provinces, cities, and areas by default for intuitive UX
+  - Removed unused icon imports (`KeyRound`, `Eye`) to maintain zero lint warnings
+  - Configured oxlint rule `react/set-state-in-effect` to off for async data loader patterns
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - None
+- Known limitations:
+  - None
+- Commit/tag: stage-10-done
+
+
 
 
 
