@@ -27,6 +27,10 @@ class AgentStreamManager:
         transcode_h265: bool = False,
     ) -> dict[str, Any]:
         """Start or return active stream worker for this stream_id."""
+        from agent.security.integrity import config_integrity_manager
+
+        config_integrity_manager.assert_integrity_before_stream()
+
         async with self._lock:
             if stream_id in self.workers:
                 worker = self.workers[stream_id]

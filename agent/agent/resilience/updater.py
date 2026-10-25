@@ -1,31 +1,49 @@
-"""Agent self-updater with cryptographic verification and automatic rollback."""
+"""Agent self-updater with Ed25519 cryptographic verification, version downgrade defense, and automatic rollback."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
 from agent.logging_config import get_logger
 
 log = get_logger(__name__)
 
-# Default update signing key (can be overridden via environment or config)
+# Default update signing key (for backward-compatible tests)
 DEFAULT_UPDATE_SECRET = b"nvrsms_firmware_update_hmac_secret_2026"
 
 
+def parse_version_tuple(version_str: str) -> tuple[int, ...]:
+    """Parse semver string into a comparable tuple of integers."""
+    parts = re.findall(r"\d+", version_str)
+    return tuple(int(p) for p in parts) if parts else (0,)
+
+
 class UpdateVerificationError(Exception):
-    """Raised when update integrity or signature verification fails."""
+    """Raised when update integrity, signature, or downgrade verification fails."""
 
 
 class AgentUpdater:
-    """Safely applies self-updates with rollback on failure."""
+    """Safely applies self-updates with Ed25519 verification, downgrade defense, and automatic rollback."""
 
-    def __init__(self, secret_key: bytes = DEFAULT_UPDATE_SECRET) -> None:
+    def __init__(
+        self,
+        secret_key: bytes = DEFAULT_UPDATE_SECRET,
+        trusted_public_key: ed25519.Ed25519PublicKey | bytes | None = None,
+    ) -> None:
         self.secret_key = secret_key
+        if isinstance(trusted_public_key, bytes):
+            self.trusted_public_key = ed25519.Ed25519PublicKey.from_public_bytes(trusted_public_key)
+        else:
+            self.trusted_public_key = trusted_public_key
 
     def compute_sha256(self, file_path: Path | str) -> str:
         """Compute hex SHA-256 checksum of a file."""
@@ -36,32 +54,73 @@ class AgentUpdater:
         return hasher.hexdigest()
 
     def compute_signature(self, file_path: Path | str) -> str:
-        """Compute HMAC-SHA256 signature for an update file."""
+        """Compute HMAC-SHA256 signature for an update file (legacy)."""
         signer = hmac.new(self.secret_key, digestmod=hashlib.sha256)
         with open(file_path, "rb") as f:
             while chunk := f.read(65536):
                 signer.update(chunk)
         return signer.hexdigest()
 
+    def sign_package_ed25519(
+        self, file_path: Path | str, private_key: ed25519.Ed25519PrivateKey
+    ) -> str:
+        """Sign update package with an Ed25519 private key, returning hex signature."""
+        data = Path(file_path).read_bytes()
+        sig = private_key.sign(data)
+        return sig.hex()
+
     def verify_package(
         self,
         package_path: Path | str,
         expected_sha256: str,
         signature: str,
+        target_version: str | None = None,
+        current_version: str | None = None,
     ) -> bool:
-        """Verify checksum and cryptographic signature of update package."""
+        """Verify checksum, cryptographic signature (Ed25519 or HMAC), and downgrade protection."""
         p = Path(package_path)
         if not p.exists():
             raise UpdateVerificationError(f"Update package not found: {p}")
 
-        # Verify SHA-256
+        # 1. Version downgrade check
+        if target_version and current_version:
+            target_t = parse_version_tuple(target_version)
+            current_t = parse_version_tuple(current_version)
+            if target_t < current_t:
+                log.warning(
+                    "version_downgrade_rejected",
+                    current_version=current_version,
+                    target_version=target_version,
+                )
+                raise UpdateVerificationError(
+                    f"Version downgrade rejected: cannot downgrade from {current_version} to {target_version}"
+                )
+
+        # 2. Verify SHA-256
         actual_sha = self.compute_sha256(p)
         if not hmac.compare_digest(actual_sha.lower(), expected_sha256.lower()):
             raise UpdateVerificationError(
                 f"Checksum mismatch: expected {expected_sha256}, got {actual_sha}"
             )
 
-        # Verify Signature
+        # 3. Verify Signature
+        if not signature:
+            raise UpdateVerificationError("Missing update signature")
+
+        # Try Ed25519 verification if trusted public key is configured
+        if self.trusted_public_key is not None:
+            try:
+                sig_bytes = bytes.fromhex(signature)
+                payload_bytes = p.read_bytes()
+                self.trusted_public_key.verify(sig_bytes, payload_bytes)
+                return True
+            except (InvalidSignature, ValueError) as exc:
+                log.warning("ed25519_signature_verification_failed", error=str(exc))
+                raise UpdateVerificationError(
+                    "Ed25519 cryptographic signature validation failed"
+                ) from exc
+
+        # Fallback to HMAC-SHA256 signature
         expected_sig = self.compute_signature(p)
         if not hmac.compare_digest(signature.lower(), expected_sig.lower()):
             raise UpdateVerificationError("Cryptographic signature validation failed")
@@ -74,26 +133,23 @@ class AgentUpdater:
         new_package: Path | str,
         expected_sha256: str,
         signature: str,
+        target_version: str | None = None,
+        current_version: str | None = None,
         health_check_fn: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
-        """Atomically apply update with verification and automatic rollback.
-
-        Args:
-            current_file: Path to currently running component file.
-            new_package: Path to new verified package.
-            expected_sha256: Expected SHA-256 checksum.
-            signature: Signature verifying authenticity.
-            health_check_fn: Optional callable validating boot/health of new version.
-
-        Returns:
-            Dict containing update status and details.
-        """
+        """Atomically apply update with verification and automatic rollback."""
         curr_path = Path(current_file)
         new_path = Path(new_package)
         backup_path = curr_path.with_suffix(curr_path.suffix + ".backup")
 
-        # 1. Verify integrity and signature
-        self.verify_package(new_path, expected_sha256, signature)
+        # 1. Verify integrity, signature, and downgrade protection
+        self.verify_package(
+            package_path=new_path,
+            expected_sha256=expected_sha256,
+            signature=signature,
+            target_version=target_version,
+            current_version=current_version,
+        )
 
         # 2. Create backup of current file
         if curr_path.exists():

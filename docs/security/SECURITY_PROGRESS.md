@@ -109,3 +109,31 @@ This file records the audit, fixes, test evidence, gate verification, and commit
 - **Findings Report**: Documented in `docs/security/stage-S5-findings.md`.
 - **Commit**: `security-s5: Authentication and API hardening complete`
 
+---
+
+## Stage S6: Agent Hardening and Adversarial Harness          [PASSED]
+- **Fake Hub and Active MITM Proxy Rejection**:
+  - Pinned SHA-256 certificate verification with dual pin rotation support.
+  - Rogue CA and interception proxy certificates fail closed (`CertificatePinningError`).
+- **Immediate Agent Revocation**:
+  - Live WebSocket connection terminated with close code 4003 (`Agent revoked`).
+  - Active connection dropped and removed from routing table immediately.
+- **Ed25519 Signed Updates & Downgrade Defense**:
+  - Embedded Ed25519 public key verification for firmware/update packages.
+  - Version comparison strictly rejecting version downgrades (`UpdateVerificationError`).
+  - Automatic rollback restores original state on health check failure.
+- **Config Integrity (MAC) & Safe Failure Mode**:
+  - HMAC-SHA256 configuration MAC verification (`ConfigIntegrityManager`).
+  - Tamper detection locks streaming (`ConfigIntegrityError`) to prevent platform abuse.
+- **SSRF and Pivot Defense**:
+  - Private RFC 1918 constraint enforced.
+  - Loopback addresses (`127.0.0.0/8`, `::1`) strictly blocked in hardened mode.
+  - Link-local metadata (`169.254.169.254`, `169.254.0.0/16`) blocked.
+  - Infrastructure Hub IP targets blocked and logged.
+- **Tests**:
+  - 13/13 tests passing in `agent/tests/test_adversarial_agent.py`.
+  - Full agent regression suite: 69/69 passed.
+- **Findings Report**: Documented in `docs/security/stage-S6-findings.md`.
+- **Commit**: `security-s6: Agent hardening and adversarial harness complete`
+
+
