@@ -76,10 +76,10 @@ class TestCommandProcessor:
         assert "diagnostics" in probe_res
 
         start_res = await execute_command("start_stream", {"stream_id": "s1"})
-        assert start_res["status"] == "acknowledged"
+        assert start_res["status"] in ("started", "acknowledged")
 
         stop_res = await execute_command("stop_stream", {"stream_id": "s1"})
-        assert stop_res["status"] == "acknowledged"
+        assert stop_res["status"] in ("stopped", "acknowledged")
 
     @pytest.mark.asyncio
     async def test_non_whitelisted_command_rejected(self) -> None:

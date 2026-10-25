@@ -67,11 +67,22 @@ async def execute_command(command: str, payload: dict[str, Any]) -> dict[str, An
             brand=brand,
         )
 
-    if command in ("start_stream", "stop_stream"):
-        # Full implementation in Stage 4
-        return {
-            "status": "acknowledged",
-            "stream_id": payload.get("stream_id"),
-        }
+    if command == "start_stream":
+        from agent.streaming.manager import agent_stream_manager
+
+        return await agent_stream_manager.start_stream(
+            stream_id=payload.get("stream_id", ""),
+            source_url=payload.get("source_url", ""),
+            target_path=payload.get("target_path", ""),
+            codec=payload.get("codec", "h264"),
+            transcode_h265=payload.get("transcode_h265", False),
+        )
+
+    if command == "stop_stream":
+        from agent.streaming.manager import agent_stream_manager
+
+        return await agent_stream_manager.stop_stream(
+            stream_id=payload.get("stream_id", ""),
+        )
 
     raise ValueError(f"Unhandled command: {command}")

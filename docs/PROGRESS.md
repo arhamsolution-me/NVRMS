@@ -191,4 +191,64 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-3-done
 
+---
+
+## Stage 4: Media Pipeline and Streaming   [PASSED]
+- Built:
+  - Hub Streaming Control & Authentication:
+    - User-bound signed JWT stream playback tokens (`hub_backend/security/stream_tokens.py`) with 60s TTL, single-camera binding (`camera_id`, `stream_type`, `tenant_id`), fail-closed validation, and scope verification
+    - MediaMTX External Authentication Webhook (`POST /api/v1/streams/auth` in `hub_backend/routes/streams.py`):
+      - Validates publishing agents via agent tokens and reading viewers via stream JWT tokens
+      - Prevents stream hijacking and unauthorized reading across cameras or tenants
+    - Stream Manager (`hub_backend/services/stream_manager.py`):
+      - In-memory viewer reference-counting supervisor
+      - On-demand streaming: on first viewer request, issues `start_stream` command to the Edge Agent responsible for the camera's NVR
+      - 1:N fan-out: subsequent viewers share the single ongoing pull from the NVR without creating duplicate ffmpeg workers or additional network load on the NVR
+      - Grace period shutdown: on last viewer disconnection, initiates a 15-second grace period countdown before issuing `stop_stream` to allow seamless tab reloads or network reconnects
+      - Per-tenant and per-agent concurrency limiting safeguards
+    - REST Endpoints (`hub_backend/routes/streams.py`):
+      - `POST /api/v1/streams/{camera_id}/token`: Request playback token for main or sub stream
+      - `POST /api/v1/streams/{camera_id}/heartbeat`: Keep-alive viewer session
+      - `POST /api/v1/streams/{camera_id}/stop`: Viewer disconnect notification
+      - `GET /api/v1/streams/active`: Query active stream sessions and viewer counts
+  - Edge Agent Stream Worker Subsystem:
+    - `StreamWorker` (`agent/streaming/worker.py`):
+      - Low-latency `ffmpeg` process supervisor utilizing `-rtsp_transport tcp`, `-c copy` native stream passthrough, and RTSP publish to MediaMTX
+      - Automatic restart watchdog upon unexpected process termination while stream is marked active
+      - H.265 fallback transcoding support (`-c:v libx264 -preset ultrafast -tune zerolatency`)
+      - Stderr monitoring and non-blocking process lifecycle management
+    - `AgentStreamManager` (`agent/streaming/manager.py`):
+      - Manages active stream workers keyed by `stream_id`
+      - Handles `start_stream` and `stop_stream` commands dispatched by Hub
+      - Clean process termination on shutdown without leaving orphaned ffmpeg processes
+    - `agent/commands.py` wired to invoke `agent_stream_manager.start_stream` and `agent_stream_manager.stop_stream`
+- Tests:
+  - Hub: 50/50 tests passing (`pytest tests/ -v`)
+    - `test_media_streaming.py`: 6 tests (stream token creation and verification, expired token rejection, tampered token rejection, MediaMTX publish auth with agent token, MediaMTX read auth with valid and mismatched tokens, on-demand streaming with 1:N fan-out verification and grace period stop)
+    - Full regression suite for Stage 0, 1, 2, 3 passing
+  - Agent: 33/33 tests passing (`pytest tests/ -v`)
+    - `test_media_streaming.py`: 4 tests (native copy ffmpeg command construction, H.265 transcode ffmpeg command construction, agent stream manager lifecycle start/stop/list, streaming commands dispatch)
+    - Full regression suite for Stage 0, 2, 3 passing
+  - Frontend: 2/2 tests passing (`npm test -- --run`)
+  - Total test count: 85 total tests passing
+- Gate:
+  - Short-lived user-bound stream tokens enforce camera, tenant, and permission boundaries: PASS
+  - MediaMTX external auth webhook allows authorized publish and read, rejects unauthorized: PASS
+  - Single NVR pull fan-out: multiple viewers share single agent stream worker without duplicate pulls: PASS
+  - Stream stops cleanly after last viewer leaves plus grace period: PASS
+  - No orphan ffmpeg subprocesses left running: PASS
+  - All linting and formatting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Resolved `agent_manager.send_command` timeout in `_grace_period_shutdown` by popping active stream session before dispatching agent command
+  - Updated `test_whitelisted_commands_execute` in `test_agent_stage2.py` to accept live stream statuses
+  - Cleaned up unused imports and variables in `agent/streaming/manager.py`, `hub_backend/routes/streams.py`, and `hub_backend/services/stream_manager.py`
+- Assumptions made:
+  - MediaMTX configured with `authMethod: http` pointing to Hub's `/api/v1/streams/auth` endpoint
+- Not verified on real hardware:
+  - Hardware H.264/H.265 encoders on physical cameras (tested with ffmpeg command line generation and mock subprocesses)
+- Known limitations:
+  - None
+- Commit/tag: stage-4-done
+
+
 
