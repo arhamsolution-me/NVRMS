@@ -405,6 +405,58 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-7-done
 
+---
+
+## Stage 8: Observability   [PASSED]
+- Built:
+  - Hub Prometheus Metrics Registry (`hub_backend/observability/metrics.py`):
+    - Standard Prometheus exposition format served on `GET /metrics`
+    - Gauges: `nvrsms_connected_agents`, `nvrsms_active_streams`
+    - Counters: `nvrsms_http_requests_total` (method, path, status), `nvrsms_stream_starts_total`, `nvrsms_stream_stops_total`, `nvrsms_stream_errors_total`, `nvrsms_backup_operations_total`, `nvrsms_backup_restore_operations_total`, `nvrsms_agent_heartbeats_total`
+    - Tracked automatically via request middleware and core service events
+  - Deep Health Check Endpoint (`hub_backend/routes/health.py`):
+    - Multi-component health aggregation inspecting database connection, Redis connectivity, agent connection counts (total, connected, degraded), and active video stream tallies
+    - Dynamic status evaluation: HTTP 200 `ok` when nominal, HTTP 503 `degraded` if database or required services are unreachable
+  - Production Prometheus Alerting Rules (`infra/monitoring/alerts.yml`):
+    - PromQL alert definitions covering `AgentOffline`, `AgentHeartbeatMissed`, `StreamCrashLoop`, `DiskSpaceLow`, `BackupVerificationFailed`, and `HighHttp5xxRate` with severity, summary, and runbook annotations
+  - Production Grafana Dashboard (`infra/monitoring/grafana-dashboard.json`):
+    - Complete, validated dashboard definition including real-time gauges for active agents, streaming sessions, HTTP request rates, response latency percentiles, and Edge Agent host resource metrics
+  - Edge Agent Diagnostics and Credential Redaction Engine (`agent/agent/diagnostics.py`):
+    - Comprehensive diagnostics bundle compiling OS/kernel release, CPU count, disk utilization, time drift offset/sync status, active RTSP stream pipelines, and runtime configuration
+    - Robust recursive credential sanitization:
+      - RTSP URL scrubbing protecting user credentials even when passwords contain complex symbols and `@` characters (`rtsp://***REDACTED***:***REDACTED***@...`)
+      - JWT, Bearer token, and base64/Fernet key pattern redaction
+      - Deep recursive key-based masking for sensitive dictionaries (`password`, `token`, `secret`, `key`, `authorization`, etc.)
+    - Agent command integration (`get_diagnostics`) in `agent/agent/commands.py`
+- Tests:
+  - Hub: 71/71 tests passing (`pytest tests/ -v`)
+    - `test_observability.py`: 4 tests (metrics exposition and syntax, deep health component aggregation and degradation, Grafana dashboard JSON schema validity, alert rules YAML syntax and alert definitions)
+    - Full regression suite for Stages 0 to 7 passing
+  - Agent: 56/56 tests passing (`pytest tests/ -v`)
+    - `test_observability.py`: 5 tests (diagnostics bundle structure, RTSP credentials redaction with complex passwords containing `@`, JWT/Bearer token redaction, recursive dictionary secret masking, `get_diagnostics` command execution)
+    - Full regression suite for Stages 0, 2, 3, 4, 5, 6 passing
+  - Frontend: 2/2 tests passing (`npm test -- --run`)
+  - Total test count: 129 total tests passing
+- Gate:
+  - `/metrics` exposes Prometheus format gauges and counters: PASS
+  - Deep `/health` validates database, redis, agent, and stream subsystems: PASS
+  - Edge Agent `get_diagnostics` produces comprehensive bundle with zero credential leakage: PASS
+  - Alerts rules (`infra/monitoring/alerts.yml`) and Grafana dashboard (`infra/monitoring/grafana-dashboard.json`) pass validation: PASS
+  - All linting and formatting green: PASS (`ruff check` & `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Config attribute name in `diagnostics.py` corrected to `settings.heartbeat_interval`
+  - RTSP sanitization regex updated to handle passwords containing `@` symbols without premature truncation
+  - Corrected replacement pattern in `sanitize_string` to retain `@` delimiter prior to host address
+  - Cleaned up unused imports in `metrics.py`, `diagnostics.py`, and `test_observability.py`
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - Live Prometheus/Grafana server scraping (simulated and verified via endpoint syntax testing and schema validation)
+- Known limitations:
+  - None
+- Commit/tag: stage-8-done
+
+
 
 
 

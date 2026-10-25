@@ -24,6 +24,7 @@ COMMAND_WHITELIST: frozenset[str] = frozenset(
         "sync_time",
         "apply_update",
         "check_network",
+        "get_diagnostics",
     ]
 )
 
@@ -130,5 +131,10 @@ async def execute_command(command: str, payload: dict[str, Any]) -> dict[str, An
         packet_loss = float(payload.get("packet_loss_pct", 0.0))
         rtt = float(payload.get("rtt_ms", 20.0))
         return network_monitor.evaluate_metrics(packet_loss_pct=packet_loss, rtt_ms=rtt)
+
+    if command == "get_diagnostics":
+        from agent.diagnostics import diagnostics_collector
+
+        return diagnostics_collector.collect_bundle()
 
     raise ValueError(f"Unhandled command: {command}")

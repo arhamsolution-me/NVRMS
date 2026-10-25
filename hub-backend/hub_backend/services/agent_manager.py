@@ -86,6 +86,10 @@ class AgentManager:
         """Check if an agent is currently connected."""
         return agent_id in self.active_agents
 
+    def get_online_count(self) -> int:
+        """Return the number of currently connected agents."""
+        return len(self.active_agents)
+
     def handle_response(self, agent_id: str, data: dict[str, Any]) -> None:
         """Route incoming command result/ack to its awaiting future."""
         conn = self.active_agents.get(agent_id)

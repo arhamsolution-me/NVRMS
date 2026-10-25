@@ -1,0 +1,38 @@
+groups:
+  - name: nvrsms_cctv_alerts
+    rules:
+      - alert: AgentOffline
+        expr: nvrsms_agents_connected_count == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Edge Agent disconnected from Hub"
+          description: "No active Edge Agent connection detected for more than 2 minutes."
+
+      - alert: HighAuthFailureRate
+        expr: rate(http_requests_total{status="401"}[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Authentication Failure Rate"
+          description: "Multiple failed login or token authentication attempts detected (>5/s)."
+
+      - alert: LowDiskSpace
+        expr: nvrsms_disk_free_mb < 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Disk Space on Edge/Hub"
+          description: "Available disk space is below 500 MB."
+
+      - alert: DRRestoreVerificationFailed
+        expr: nvrsms_dr_verifications_total{status="failed"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disaster Recovery Verification Failed"
+          description: "Automated scratch database restore integrity check failed."
