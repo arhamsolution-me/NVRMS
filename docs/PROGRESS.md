@@ -456,6 +456,71 @@ This file is appended after each completed stage.
   - None
 - Commit/tag: stage-8-done
 
+---
+
+## Stage 9: Frontend Foundation   [PASSED]
+- Built:
+  - Enterprise Design System (`frontend/src/index.css` & `frontend/src/App.css`):
+    - Light/white theme with crisp modern typography, glassmorphism top navigation, and curated color tokens:
+      - Primary indigo brand (`#4f46e5`), subtle borders (`#e2e8f0`), ambient card shadows, status badges (online/emerald, warning/amber, offline/rose, info/sky)
+      - Responsive navigation layout with collapsible slate sidebar and top header
+  - Typed API Client Layer (`frontend/src/api/types.ts` & `frontend/src/api/client.ts`):
+    - Comprehensive TypeScript schemas for `User`, `Tenant`, `Role`, `Permission`, `Location`, `NVR`, `Camera`, `StreamSession`, `Agent`, `AuditLog`
+    - Robust `apiClient` fetch wrapper with automated `Authorization: Bearer <token>` injection
+    - Automatic 401 retry interceptor: queues concurrent requests, calls `/api/v1/auth/refresh`, updates access token, and retries original requests
+    - Standardized `ApiError` class with status codes and structured detail parsing
+  - Authentication and RBAC Context (`frontend/src/context/AuthContext.tsx`):
+    - Global state for authenticated user, tenant, and effective permissions set
+    - Handlers for login with TOTP 2FA prompt detection, token renewal, profile sync, and logout
+    - `hasPermission(permissionCode)` utility supporting instant superuser bypass and granular role permission checking
+    - Real-time permission event listener syncing permissions across tabs and WebSocket broadcasts
+  - Global Toast Notification System (`frontend/src/context/ToastContext.tsx`):
+    - Non-blocking floating alerts for success, error, warning, and info messages
+  - Application Navigation Shell (`frontend/src/components/layout/`):
+    - `Navbar.tsx`: Top bar displaying organization name, real-time live WebSocket indicator, superuser badge, 2FA status, and user avatar dropdown with logout action
+    - `Sidebar.tsx`: Collapsible navigation menu linking to Dashboard, Live Monitor, Locations, Devices, Edge Agents, Users, Roles & RBAC, Audit Logs, and System Settings
+    - `AppLayout.tsx`: Composite layout shell with sidebar, top navbar, and content outlet
+  - Route Guards & Access Control:
+    - `ProtectedRoute.tsx`: Intercepts unauthenticated navigation and redirects to `/login`
+    - `PermissionRoute.tsx`: Inspects required permissions and displays a polished 403 `AccessDenied` card if unauthorized
+  - Core Pages:
+    - `LoginPage.tsx`: Polished login portal with animated badge, email/password fields, conditional 6-digit TOTP input, and quick-fill test profile buttons
+    - `DashboardPage.tsx`: Live telemetry dashboard with real-time metric cards (Active Streams, Edge Agents, Cameras, System Health) and user scope banner
+    - `NotFoundPage.tsx`: 404 error page with quick return to dashboard
+    - Foundation views for Live Monitor, Locations, Devices, Agents, Users, Roles, Audit, and Settings
+- Tests:
+  - Frontend: 19/19 tests passing (`npm test -- --run`)
+    - `client.test.ts`: 4 tests (token storage lifecycle, Bearer header injection, ApiError construction, 401 refresh queuing and retry)
+    - `guards.test.tsx`: 4 tests (ProtectedRoute login redirect, ProtectedRoute content render, PermissionRoute 403 card on revoked permission, PermissionRoute allowed access)
+    - `auth.test.tsx`: 5 tests (unauthenticated initialization, login success and superuser permission bypass, TOTP requirement prompt, explicit permission evaluation for non-superusers, state reset on logout)
+    - `navigation.test.tsx`: 4 tests (Navbar tenant and live indicator, user profile dropdown and logout click, Sidebar navigation links, Sidebar collapse/expand toggle)
+    - `App.test.tsx`: 2 tests (unauthenticated routing to login, quick-fill profile buttons)
+  - Hub: 71/71 tests passing (`pytest tests/ -v`)
+  - Agent: 56/56 tests passing (`pytest tests/ -v`)
+  - Total test count: 146 total tests passing across full platform
+- Gate:
+  - Clean light/white theme and design tokens render properly: PASS
+  - Typed API client handles token refresh and Bearer headers: PASS
+  - AuthContext provides reactive authentication and permission checks: PASS
+  - Navigation shell displays organization, live status, and responsive sidebar: PASS
+  - Route guards protect authenticated and permission-restricted routes: PASS
+  - Production build bundle succeeds (`npm run build`): PASS
+  - All linting clean (`oxlint` on frontend, `ruff` on hub and agent): PASS
+- Issues found and fixed:
+  - Installed `react-router-dom` and `lucide-react` dependencies
+  - Aligned `vite.config.ts` with `vitest/config` for strict type checking
+  - Excluded test files from `tsconfig.app.json` for clean production bundle compilation
+  - Refactored `AuthContext.tsx` and `ToastContext.tsx` to use type-only imports for `verbatimModuleSyntax`
+  - Fixed return type discrepancy on `refreshProfile` in `AuthContext`
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - None
+- Known limitations:
+  - None
+- Commit/tag: stage-9-done
+
+
 
 
 

@@ -1,17 +1,23 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import App from './App'
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import App from './App';
 
 describe('App', () => {
-  it('renders the main heading', () => {
-    render(<App />)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Get started/i)
-  })
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
-  it('renders the counter button', () => {
-    render(<App />)
-    const button = screen.getByRole('button')
-    expect(button).toBeInTheDocument()
-    expect(button).toHaveTextContent(/Count is 0/i)
-  })
-})
+  it('renders the login interface when unauthenticated', async () => {
+    render(<App />);
+    expect(screen.getByTestId('login-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/NVRSMS Hub/i);
+    expect(screen.getByTestId('login-email-input')).toBeInTheDocument();
+    expect(screen.getByTestId('login-password-input')).toBeInTheDocument();
+  });
+
+  it('renders quick fill buttons for test profiles', () => {
+    render(<App />);
+    expect(screen.getByTestId('quick-fill-admin')).toBeInTheDocument();
+    expect(screen.getByTestId('quick-fill-operator')).toBeInTheDocument();
+  });
+});
