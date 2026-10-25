@@ -27,7 +27,21 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
         version=settings.app_version,
         env=settings.app_env,
     )
+    # Seed default data on startup
+    try:
+        from hub_backend.db import get_db_context
+        from hub_backend.services.seed import seed_initial_data
+
+        async with get_db_context() as session:
+            await seed_initial_data(session)
+    except Exception as exc:
+        log.warning("startup_seed_deferred", error=str(exc))
+
     yield
+
+    from hub_backend.redis import close_redis
+
+    await close_redis()
     log.info("hub_stopped")
 
 
@@ -67,9 +81,23 @@ def create_app() -> FastAPI:
         return response
 
     # ── Routes ─────────────────────────────────────────────
-    from hub_backend.routes import health  # noqa: PLC0415
+    from hub_backend.routes import (  # noqa: PLC0415
+        audit_router,
+        auth_router,
+        health_router,
+        locations_router,
+        roles_router,
+        users_router,
+        ws_router,
+    )
 
-    app.include_router(health.router)
+    app.include_router(health_router)
+    app.include_router(auth_router)
+    app.include_router(roles_router)
+    app.include_router(locations_router)
+    app.include_router(users_router)
+    app.include_router(audit_router)
+    app.include_router(ws_router)
 
     return app
 

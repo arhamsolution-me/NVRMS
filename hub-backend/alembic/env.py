@@ -28,8 +28,15 @@ import hub_backend.models  # noqa: F401, E402
 
 
 def get_url() -> str:
-    settings = get_settings()
-    return settings.database_url
+    cfg_url = config.get_main_option("sqlalchemy.url")
+    if cfg_url and not cfg_url.startswith("driver://"):
+        url = cfg_url
+    else:
+        settings = get_settings()
+        url = settings.database_url
+    if url.startswith("sqlite:///"):
+        url = url.replace("sqlite:///", "sqlite+aiosqlite:///")
+    return url
 
 
 def run_migrations_offline() -> None:

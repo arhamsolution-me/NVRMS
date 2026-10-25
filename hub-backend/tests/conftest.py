@@ -4,39 +4,42 @@ from __future__ import annotations
 
 import asyncio
 import os
+import uuid
+from collections.abc import AsyncGenerator, Generator
 
 # Override settings for tests before any hub_backend imports
 os.environ.setdefault("SECRET_KEY", "test-secret-key-at-least-32-characters-long")
 os.environ.setdefault("POSTGRES_PASSWORD", "nvrsms")
 os.environ.setdefault("REDIS_PASSWORD", "testpass")
 os.environ.setdefault("SUPER_ADMIN_PASSWORD", "SuperAdmin123!")
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault(
+    "TEST_DATABASE_URL", "sqlite+aiosqlite:///file:testdb?mode=memory&cache=shared&uri=true"
+)
+os.environ.setdefault(
+    "DATABASE_URL", "sqlite+aiosqlite:///file:testdb?mode=memory&cache=shared&uri=true"
+)
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
 os.environ.setdefault("APP_ENV", "development")
-
-from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from hub_backend.db import Base
+import hub_backend.models  # noqa: F401
+from hub_backend.db import Base, get_db
+from hub_backend.main import app
+from hub_backend.security.tokens import create_access_token
+from hub_backend.services.seed import seed_initial_data
 
 
-# ── Test database URL ──────────────────────────────────────────────
 def get_test_db_url() -> str:
-    """Get test database URL from environment or use a default."""
+    """Get test database URL."""
     return os.environ.get(
         "TEST_DATABASE_URL",
-        "postgresql+asyncpg://nvrsms:nvrsms@localhost:5432/nvrsms_test",
+        "sqlite+aiosqlite:///file:testdb?mode=memory&cache=shared&uri=true",
     )
 
 
-def get_test_redis_url() -> str:
-    return os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/1")
-
-
-# ── Async engine for tests ─────────────────────────────────────────
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create event loop for the test session."""
@@ -47,19 +50,24 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 @pytest.fixture(scope="session")
 async def test_engine():
-    """Create async engine pointing at the test database."""
-    engine = create_async_engine(
-        get_test_db_url(),
-        echo=False,
-        pool_pre_ping=True,
-    )
-    # Create all tables
+    """Create async engine pointing at test database and create all tables."""
+    db_url = get_test_db_url()
+    engine_kwargs = {"echo": False}
+    if not db_url.startswith("sqlite"):
+        engine_kwargs["pool_pre_ping"] = True
+
+    engine = create_async_engine(db_url, **engine_kwargs)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Seed initial system data (roles, perms, super-admin)
+    async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
+        await seed_initial_data(session)
+
     yield engine
 
-    # Drop all tables after session
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
@@ -67,7 +75,7 @@ async def test_engine():
 
 @pytest.fixture
 async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Yield a transactional session that rolls back after each test."""
+    """Yield a transactional session for database operations."""
     async_session = async_sessionmaker(
         bind=test_engine,
         class_=AsyncSession,
@@ -75,29 +83,52 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     )
     async with async_session() as session:
         yield session
-        await session.rollback()
 
 
 @pytest.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    """HTTPX async client pointed at the FastAPI app."""
-    # Override settings for tests
-    os.environ.setdefault("SECRET_KEY", "test-secret-key-at-least-32-characters-long")
-    os.environ.setdefault("POSTGRES_PASSWORD", "nvrsms")
-    os.environ.setdefault("REDIS_PASSWORD", "testpass")
-    os.environ.setdefault("SUPER_ADMIN_PASSWORD", "SuperAdmin123!")
-    os.environ.setdefault("DATABASE_URL", get_test_db_url())
-    os.environ.setdefault("REDIS_URL", get_test_redis_url())
-    os.environ.setdefault("APP_ENV", "development")
+async def client(test_engine) -> AsyncGenerator[AsyncClient, None]:
+    """HTTPX async client pointed at the FastAPI app with test DB dependency override."""
+    async_session = async_sessionmaker(
+        bind=test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
 
-    from hub_backend.config import get_settings
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with async_session() as session:
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
 
-    get_settings.cache_clear()  # type: ignore[attr-defined]
-
-    from hub_backend.main import app
+    app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as ac:
         yield ac
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_header_factory():
+    """Factory creating Authorization headers with a valid JWT for given user parameters."""
+
+    def _make(
+        user_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        role_id: uuid.UUID,
+        is_superuser: bool = False,
+    ) -> dict[str, str]:
+        token = create_access_token(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            role_id=role_id,
+            is_superuser=is_superuser,
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    return _make

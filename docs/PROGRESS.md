@@ -36,3 +36,63 @@ This file is appended after each completed stage.
 - Known limitations:
   - None for foundation stage
 - Commit/tag: stage-0-done
+
+---
+
+## Stage 1: Hub Core   [PASSED]
+- Built:
+  - Complete multi-tenant relational schema: `tenants`, `roles`, `permissions`, `role_permissions`, `provinces`, `cities`, `areas`, `sites`, `users`, `user_scopes`, `refresh_tokens`, `audit_logs`
+  - Alembic migration `0002_hub_core.py` with idempotent upgrade and downgrade
+  - Security suite:
+    - Argon2id password hashing and verification (`hub_backend/security/password.py`)
+    - JWT access tokens (15m) and rotating refresh tokens stored with SHA-256 and token family tracking (`hub_backend/security/tokens.py`)
+    - Account lockout after 5 consecutive failed attempts with 15-minute freeze
+    - Refresh token reuse detection with immediate revocation of entire token family
+    - Two-Factor Authentication (TOTP via `pyotp`) with provisioning URI and code validation
+  - Authorization & Data Scoping:
+    - Versioned Redis permission cache with instant invalidation upon role permission modification (`hub_backend/security/rbac.py`)
+    - `require_permission(code)` dependency enforcing fail-closed authorization on all endpoints
+    - Hierarchical location scoping: Province -> City -> Area -> Site isolation (`hub_backend/security/scoping.py`)
+    - Cross-tenant resource concealment (404 instead of 403) to prevent enumeration
+    - Protection for last remaining active Super Admin against deletion, deactivation, or demotion
+  - Real-time & Audit Infrastructure:
+    - WebSocket connection manager broadcasting `permissions_changed` events (`hub_backend/ws/events.py`)
+    - Immutable structured audit logger recording security events, resource mutations, client IP, and User-Agent
+    - System startup seeder: provisions root tenant, 22 granular system permissions, Super Admin & Viewer roles, and root super-admin account
+  - REST API Routers:
+    - `/api/v1/auth`: `/login`, `/refresh`, `/logout`, `/me`, `/totp/setup`, `/totp/verify`
+    - `/api/v1/roles`: CRUD and permission matrix toggle endpoint (`PUT /api/v1/roles/{id}/permissions`)
+    - `/api/v1/locations`: Provinces, Cities, Areas, Sites, and hierarchical `/tree` endpoint with user scope filtering
+    - `/api/v1/users`: User accounts with role assignments and location scope bindings
+    - `/api/v1/audit`: Audit trail inspection with action/resource filtering
+- Tests:
+  - Hub: 30/30 tests passing (`pytest tests/ -v`)
+    - `test_auth.py`: 10 tests (login, invalid creds, unknown user, 5-strike lockout, token rotation, reuse detection, /me, TOTP full cycle)
+    - `test_rbac.py`: 3 tests (superuser bypass, unauthorized 403, instant permission toggle on very next request)
+    - `test_scoping.py`: 3 tests (Site A vs Site B isolation, cross-tenant isolation, hierarchical province/city/area scoping)
+    - `test_superadmin_protection.py`: 2 tests (cannot deactivate or delete last super-admin)
+    - `test_audit.py`: 1 test (verifies AUTH_LOGIN and ROLE_CREATE audit logs)
+    - `test_crud_routes.py`: 5 tests (role CRUD, location hierarchy CRUD, user CRUD, audit filters, logout)
+    - `test_health.py`: 6 tests (health checks, correlation ID, CORS)
+    - `test_migrations.py`: 1 test (Alembic upgrade/downgrade full cycle)
+  - Agent regression: 5/5 tests passing
+  - Frontend regression: 2/2 tests passing
+  - Total test count: 37 total tests passing
+- Gate:
+  - Permission toggled off immediately blocks the API on next request: PASS (verified in `test_instant_permission_toggle_effect_on_next_request`)
+  - Cross-scope access tests return 403/404: PASS (verified in `test_site_scope_isolation_and_cross_site_blocked` and `test_cross_tenant_isolation`)
+  - Audit log verified: PASS (verified in `test_audit_logs_recorded_for_login_and_actions` and `test_audit_log_filters`)
+  - Last super-admin protection verified: PASS (verified in `test_cannot_deactivate_last_super_admin` and `test_cannot_delete_last_super_admin`)
+  - Refresh token reuse detection verified: PASS (verified in `test_refresh_token_reuse_detection`)
+  - All linting green: PASS (`ruff check` and `ruff format` on hub and agent; `oxlint` on frontend)
+- Issues found and fixed:
+  - Pydantic EmailStr rejected `.local` mDNS domains by default; updated to standard RFC regex pattern allowing `.local` intranet addresses
+  - SQLite offset-naive datetime comparisons resolved with `ensure_utc` helper in `hub_backend/models/base.py`
+  - Fixed Alembic `env.py` URL override resolution to correctly target scratch databases during migration tests
+- Assumptions made:
+  - None
+- Not verified on real hardware:
+  - None (Hub core is pure backend/auth)
+- Known limitations:
+  - None
+- Commit/tag: stage-1-done
