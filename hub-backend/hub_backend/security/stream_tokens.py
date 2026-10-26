@@ -60,7 +60,7 @@ def create_stream_token(
     if client_ip:
         payload["client_ip"] = client_ip
 
-    return jwt.encode(  # type: ignore[no-any-return]
+    return jwt.encode(
         payload,
         settings.secret_key.get_secret_value(),
         algorithm=settings.jwt_algorithm,
@@ -92,4 +92,6 @@ def verify_stream_token(token: str, client_ip: str | None = None) -> dict[str, A
     if client_ip and payload.get("client_ip") and payload["client_ip"] != client_ip:
         raise ValueError("Stream token client IP mismatch")
 
-    return payload
+    from typing import cast
+
+    return cast(dict[str, Any], payload)

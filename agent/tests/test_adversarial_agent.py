@@ -237,7 +237,10 @@ class TestTamperResistanceAndConfigIntegrity:
         # Artificially set tamper flag
         config_integrity_manager.is_tampered = True
 
-        with pytest.raises(ConfigIntegrityError, match="stream refused because agent configuration tamper was detected"):
+        with pytest.raises(
+            ConfigIntegrityError,
+            match="stream refused because agent configuration tamper was detected",
+        ):
             await stream_manager.start_stream(
                 stream_id="stream_tamper_test",
                 source_url="rtsp://192.168.1.100:554/live",

@@ -40,14 +40,20 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── CORS ───────────────────────────────────────────────
-    allowed_origins: list[str] = ["http://localhost:5173"]
+    allowed_origins: str | list[str] = ["http://localhost:5173"]
 
-    @field_validator("allowed_origins", mode="before")
+    @field_validator("allowed_origins", mode="after")
     @classmethod
     def split_origins(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
+            import json
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return [str(x) for x in json.loads(v)]
+                except Exception:
+                    pass
             return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+        return list(v)
 
     # ── Logging ────────────────────────────────────────────
     log_level: str = "INFO"
@@ -61,7 +67,7 @@ class Settings(BaseSettings):
 
     # ── Super admin seed ──────────────────────────────────
     super_admin_email: str = "admin@nvrsms.local"
-    super_admin_password: SecretStr = Field(default="changeme123!")
+    super_admin_password: SecretStr = Field(default=SecretStr("changeme123!"))
 
     @property
     def is_production(self) -> bool:

@@ -53,6 +53,10 @@ async def main() -> None:
             storage.save(creds)
             log.info("agent_enrolment_succeeded_saved_credentials", agent_id=creds["agent_id"])
 
+    if creds is None:
+        log.error("agent_credentials_not_found_and_no_enrolment_code")
+        return
+
     log.info("agent_starting_control_channel", agent_id=creds["agent_id"])
     client = AgentClient(
         agent_id=creds["agent_id"],

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -26,7 +27,7 @@ def _make_engine() -> None:
 
 settings = get_settings()
 
-engine_kwargs = {"echo": settings.is_development}
+engine_kwargs: dict[str, Any] = {"echo": settings.is_development}
 if not settings.database_url.startswith("sqlite"):
     engine_kwargs.update(
         {

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request, Response
@@ -20,7 +20,7 @@ settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # type: ignore[type-arg]
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: startup and shutdown hooks."""
     log.info(
         "hub_starting",
@@ -29,8 +29,13 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
     )
     # Seed default data on startup
     try:
-        from hub_backend.db import get_db_context
+        from hub_backend.db import engine, get_db_context
+        from hub_backend.models.base import Base
+        import hub_backend.models  # noqa: F401
         from hub_backend.services.seed import seed_initial_data
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         async with get_db_context() as session:
             await seed_initial_data(session)
@@ -70,7 +75,9 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
-    async def correlation_id_middleware(request: Request, call_next: Any) -> Response:
+    async def correlation_id_middleware(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Inject a correlation ID into every request's log context."""
         correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
         structlog.contextvars.clear_contextvars()

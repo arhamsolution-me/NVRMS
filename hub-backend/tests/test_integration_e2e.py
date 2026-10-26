@@ -15,6 +15,7 @@ Validates:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import uuid
 
@@ -293,8 +294,9 @@ class TestEndToEndPlatformIntegration:
         assert stop_res_2.status_code == 200
 
         # Close agent websocket
-        await ws.incoming.put(None)
-        await gateway_task
+        gateway_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await gateway_task
 
     @pytest.mark.asyncio
     async def test_e2e_hierarchical_scoping_and_cross_tenant_isolation(

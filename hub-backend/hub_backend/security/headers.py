@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 DEFAULT_MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -15,7 +16,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,  # type: ignore[no-untyped-def]
+        app: ASGIApp,
         max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     ) -> None:
         super().__init__(app)
@@ -32,7 +33,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 if length > self.max_body_bytes:
                     return Response(
                         content='{"detail": "Request payload too large"}',
-                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                         media_type="application/json",
                     )
             except ValueError:

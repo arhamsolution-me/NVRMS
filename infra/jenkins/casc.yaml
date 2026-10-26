@@ -1,0 +1,87 @@
+jenkins:
+  systemMessage: "NVRSMS Platform CI/CD — Automated Local Jenkins Controller"
+  numExecutors: 4
+  mode: NORMAL
+  scmCheckoutRetryCount: 3
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_USER}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: true
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+    adminAddress: "admin@nvrsms.local"
+
+jobs:
+  - script: |
+      pipelineJob('nvrsms-pipeline') {
+        description('NVRSMS Platform Full CI Pipeline')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('file:///mnt/d/NVRSMS')
+                }
+                branch('*/master')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+        properties {
+          buildDiscarder {
+            strategy {
+              logRotator {
+                numToKeepStr('10')
+                daysToKeepStr('30')
+                artifactDaysToKeepStr('30')
+                artifactNumToKeepStr('10')
+              }
+            }
+          }
+          disableConcurrentBuilds()
+        }
+      }
+
+  - script: |
+      pipelineJob('nvrsms-nightly') {
+        description('NVRSMS Platform Nightly Soak and Load Pipeline')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('file:///mnt/d/NVRSMS')
+                }
+                branch('*/master')
+              }
+            }
+            scriptPath('Jenkinsfile.nightly')
+            lightweight(true)
+          }
+        }
+        properties {
+          buildDiscarder {
+            strategy {
+              logRotator {
+                numToKeepStr('5')
+                daysToKeepStr('30')
+                artifactDaysToKeepStr('30')
+                artifactNumToKeepStr('5')
+              }
+            }
+          }
+          disableConcurrentBuilds()
+        }
+      }

@@ -137,7 +137,10 @@ async def refresh_token_endpoint(
 
 
 @router.post(
-    "/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Log out and clear session cookies"
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Log out and clear session cookies",
 )
 async def logout(
     response: Response,
@@ -270,6 +273,7 @@ async def list_sessions(
 @router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Revoke a specific session",
 )
 async def revoke_session(
@@ -297,6 +301,7 @@ async def revoke_session(
 @router.delete(
     "/sessions",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Revoke all sessions for current user",
 )
 async def revoke_all_sessions(
@@ -326,4 +331,3 @@ async def revoke_all_sessions(
         user_id=current_user.id,
     )
     await db.commit()
-

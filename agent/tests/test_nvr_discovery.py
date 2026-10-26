@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from pathlib import Path
 
 import pytest
@@ -107,8 +108,14 @@ class TestReachabilityAndLockout:
     @pytest.mark.asyncio
     async def test_reachability_on_open_port(self) -> None:
         """Probing an active server port succeeds."""
+
+        async def handle_client(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            w.close()
+            with contextlib.suppress(Exception):
+                await w.wait_closed()
+
         # Start a local TCP server
-        server = await asyncio.start_server(lambda r, w: None, "127.0.0.1", 0)
+        server = await asyncio.start_server(handle_client, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]
 
         reachable, msg = await check_tcp_port("127.0.0.1", port, timeout=1.0)
@@ -151,7 +158,12 @@ class TestVendorTemplatesAndProbe:
     @pytest.mark.asyncio
     async def test_probe_nvr_full_flow(self) -> None:
         """Probe against active socket enumerates channels with structured metadata."""
-        server = await asyncio.start_server(lambda r, w: None, "127.0.0.1", 0)
+        async def handle_client(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            w.close()
+            with contextlib.suppress(Exception):
+                await w.wait_closed()
+
+        server = await asyncio.start_server(handle_client, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]
 
         result = await probe_nvr(

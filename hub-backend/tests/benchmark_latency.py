@@ -2,10 +2,12 @@
 
 import os
 import time
+
 from hub_backend.security.session_crypto import (
     KeyExchangeSession,
     StreamPacketCipher,
 )
+
 
 def run_benchmark():
     # 1. Ephemeral key negotiation
@@ -47,13 +49,13 @@ def run_benchmark():
 
     total_added_latency_ms = enc_per_frame_ms + dec_per_frame_ms
 
-    print("=== LATENCY OVERHEAD BENCHMARK (AES-256-GCM Segment B) ===")
-    print(f"Sample Frame Size: {len(test_frame)} bytes (64 KB)")
-    print(f"Iterations: {iterations}")
-    print(f"Average Encryption Latency: {enc_per_frame_ms:.4f} ms/frame")
-    print(f"Average Decryption Latency: {dec_per_frame_ms:.4f} ms/frame")
-    print(f"Total Added Hop-by-Hop Latency: {total_added_latency_ms:.4f} ms/frame")
-    print(f"Budget: 100.0 ms | Within Budget: {total_added_latency_ms < 100.0}")
+    print("=== LATENCY OVERHEAD BENCHMARK (AES-256-GCM Segment B) ===")  # noqa: T201
+    print(f"Sample Frame Size: {len(test_frame)} bytes (64 KB)")  # noqa: T201
+    print(f"Iterations: {iterations}")  # noqa: T201
+    print(f"Average Encryption Latency: {enc_per_frame_ms:.4f} ms/frame")  # noqa: T201
+    print(f"Average Decryption Latency: {dec_per_frame_ms:.4f} ms/frame")  # noqa: T201
+    print(f"Total Added Hop-by-Hop Latency: {total_added_latency_ms:.4f} ms/frame")  # noqa: T201
+    print(f"Budget: 100.0 ms | Within Budget: {total_added_latency_ms < 100.0}")  # noqa: T201
 
     return {
         "frame_size_bytes": len(test_frame),
@@ -62,6 +64,7 @@ def run_benchmark():
         "dec_per_frame_ms": dec_per_frame_ms,
         "total_added_latency_ms": total_added_latency_ms,
     }
+
 
 if __name__ == "__main__":
     run_benchmark()

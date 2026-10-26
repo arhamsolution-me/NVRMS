@@ -124,7 +124,12 @@ async def update_role(
     return role
 
 
-@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete role")
+@router.delete(
+    "/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete role",
+)
 async def delete_role(
     role_id: uuid.UUID,
     current_user: User = Depends(require_permission("roles:write")),

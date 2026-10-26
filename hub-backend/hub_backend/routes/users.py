@@ -60,7 +60,9 @@ async def create_user(
     # Validate password complexity and breach list
     is_valid, err_msg = check_password_strength(req.password)
     if not is_valid:
-        raise HTTPException(status_code=400, detail=f"Password does not meet security policy: {err_msg}")
+        raise HTTPException(
+            status_code=400, detail=f"Password does not meet security policy: {err_msg}"
+        )
 
     user = User(
         tenant_id=current_user.tenant_id,
@@ -160,7 +162,9 @@ async def update_user(
     if req.password:
         is_valid, err_msg = check_password_strength(req.password)
         if not is_valid:
-            raise HTTPException(status_code=400, detail=f"Password does not meet security policy: {err_msg}")
+            raise HTTPException(
+                status_code=400, detail=f"Password does not meet security policy: {err_msg}"
+            )
         user.password_hash = hash_password(req.password)
 
     # Scopes update if provided
@@ -195,7 +199,12 @@ async def update_user(
     return res.scalar_one()
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete user")
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete user",
+)
 async def delete_user(
     user_id: uuid.UUID,
     current_user: User = Depends(require_permission("users:write")),

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import redis.asyncio as aioredis
-from redis.asyncio import Redis
-
 from hub_backend.config import get_settings
 from hub_backend.logging_config import get_logger
+from redis.asyncio import Redis
 
 log = get_logger(__name__)
 
@@ -21,7 +20,7 @@ async def get_redis() -> Redis:
 
     settings = get_settings()
     try:
-        client: Redis = aioredis.from_url(
+        client: Redis = aioredis.from_url(  # type: ignore[no-untyped-call]
             settings.redis_url,
             decode_responses=True,
             socket_timeout=2.0,
@@ -33,7 +32,7 @@ async def get_redis() -> Redis:
         return _redis_client
     except Exception as exc:
         log.warning("redis_connection_failed_falling_back_to_fakeredis", error=str(exc))
-        import fakeredis.aioredis  # type: ignore[import-untyped]
+        import fakeredis.aioredis
 
         _redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
         return _redis_client

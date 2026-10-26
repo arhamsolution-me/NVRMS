@@ -36,4 +36,3 @@ class AuditLog(UUIDModel):
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     record_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
-

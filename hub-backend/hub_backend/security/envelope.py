@@ -72,9 +72,7 @@ class EnvelopeEncryptor:
             except InvalidToken as err:
                 last_error = err
                 continue
-        raise EnvelopeEncryptionError(
-            f"Failed to unwrap DEK with any configured KEK: {last_error}"
-        )
+        raise EnvelopeEncryptionError(f"Failed to unwrap DEK with any configured KEK: {last_error}")
 
     def decrypt(self, envelope_json: str) -> str:
         """Unwrap DEK using primary or fallback KEK and decrypt ciphertext."""

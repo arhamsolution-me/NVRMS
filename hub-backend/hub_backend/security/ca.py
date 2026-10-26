@@ -29,8 +29,11 @@ class InternalCA:
         self._revoked_serials: set[int] = set()
 
         if ca_key_pem and ca_cert_pem:
-            self.ca_key = serialization.load_pem_private_key(
-                ca_key_pem, password=None, backend=self.backend
+            from typing import cast
+
+            self.ca_key: ec.EllipticCurvePrivateKey = cast(
+                ec.EllipticCurvePrivateKey,
+                serialization.load_pem_private_key(ca_key_pem, password=None, backend=self.backend),
             )
             self.ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, backend=self.backend)
         else:
@@ -194,7 +197,13 @@ class InternalCA:
 
         # 3. Check signature against Root CA
         try:
-            self.ca_cert.public_key().verify(
+            ca_pub = self.ca_cert.public_key()
+            if (
+                not isinstance(ca_pub, ec.EllipticCurvePublicKey)
+                or cert.signature_hash_algorithm is None
+            ):
+                return False
+            ca_pub.verify(
                 cert.signature,
                 cert.tbs_certificate_bytes,
                 ec.ECDSA(cert.signature_hash_algorithm),

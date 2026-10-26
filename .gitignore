@@ -64,3 +64,6 @@ frontend/dist/
 # Backup archives
 backups/
 *.enc
+
+# SQLite local databases
+*.db

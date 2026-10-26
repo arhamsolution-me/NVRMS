@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -99,7 +100,7 @@ async def get_role_permissions(
         await redis.set(version_key, "1")
 
     cache_key = f"role_perms:{role_str}:{version}"
-    cached = await redis.smembers(cache_key)
+    cached = await redis.smembers(cache_key)  # type: ignore[misc]
     if cached:
         return set(cached)
 
@@ -117,7 +118,7 @@ async def get_role_permissions(
 
     # Populate cache
     if perms:
-        await redis.sadd(cache_key, *perms)
+        await redis.sadd(cache_key, *perms)  # type: ignore[misc]
         await redis.expire(cache_key, 3600)
 
     return perms
@@ -138,7 +139,7 @@ async def invalidate_role_cache(role_id: uuid.UUID) -> None:
     )
 
 
-def require_permission(permission_code: str) -> Callable[..., User]:
+def require_permission(permission_code: str) -> Callable[..., Any]:
     """FastAPI dependency factory enforcing a specific permission code."""
 
     async def dependency(

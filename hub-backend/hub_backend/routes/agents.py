@@ -110,7 +110,8 @@ async def enrol_agent(
             detail="Enrolment code has already been used",
         )
 
-    if ensure_utc(token_rec.expires_at) < now:
+    exp_utc = ensure_utc(token_rec.expires_at)
+    if exp_utc is None or exp_utc < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Enrolment code has expired (15 minute validity exceeded)",
@@ -306,5 +307,3 @@ async def dispatch_command_to_agent(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-

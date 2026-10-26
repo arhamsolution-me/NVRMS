@@ -166,9 +166,9 @@ class TestConcurrentStreamFanOutLoad:
 
             # CRITICAL: Even with 30 concurrent viewers, only ONE start_stream command was sent to the agent!
             start_commands = [c for c in dispatched_commands if c["action"] == "start_stream"]
-            assert len(start_commands) == 1, (
-                f"Expected 1 start_stream command, got {len(start_commands)}"
-            )
+            assert (
+                len(start_commands) == 1
+            ), f"Expected 1 start_stream command, got {len(start_commands)}"
 
             # 2. 30 viewers leave concurrently
             async def leave_stream(viewer_idx: int) -> None:

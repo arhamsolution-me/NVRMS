@@ -159,7 +159,8 @@ async def rotate_refresh_token(
     res = await db.execute(stmt)
     token_rec = res.scalar_one_or_none()
 
-    if not token_rec or ensure_utc(token_rec.expires_at) < now:
+    exp_utc = ensure_utc(token_rec.expires_at) if token_rec else None
+    if not token_rec or exp_utc is None or exp_utc < now:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",

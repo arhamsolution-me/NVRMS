@@ -315,7 +315,10 @@ class StreamManager:
         """Cancel any running grace tasks and clear active streams."""
         for session in list(self.active_streams.values()):
             if session.grace_task and not session.grace_task.done():
-                session.grace_task.cancel()
+                try:
+                    session.grace_task.cancel()
+                except (RuntimeError, Exception):
+                    pass
         self.active_streams.clear()
 
 

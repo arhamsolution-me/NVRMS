@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import secrets
 from datetime import UTC, datetime
@@ -219,7 +220,7 @@ class AgentClient:
             finally:
                 self._connected = False
                 heartbeat_task.cancel()
-                with asyncio.suppress(Exception):
+                with contextlib.suppress(Exception):
                     await heartbeat_task
 
     async def run(self) -> None:

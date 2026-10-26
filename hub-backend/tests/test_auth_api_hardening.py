@@ -40,6 +40,7 @@ async def test_route_enumeration_all_routes_protected() -> None:
         "/api/v1/auth/login",
         "/api/v1/auth/refresh",
         "/api/v1/agents/enrol",
+        "/api/v1/streams/auth",
         "/api/v1/streams/mediamtx/auth",
         # Docs / OpenAPI routes if non-production
         "/api/docs",
@@ -66,7 +67,12 @@ async def test_route_enumeration_all_routes_protected() -> None:
 
             has_auth_dep = False
             for d in all_deps:
-                call_name = getattr(d.call, "__qualname__", "") or getattr(d.call, "__name__", "")
+                call_obj = getattr(d, "dependency", None) or getattr(d, "call", None)
+                call_name = (
+                    getattr(call_obj, "__qualname__", "")
+                    or getattr(call_obj, "__name__", "")
+                    or str(call_obj)
+                )
                 if any(
                     k in call_name.lower()
                     for k in (

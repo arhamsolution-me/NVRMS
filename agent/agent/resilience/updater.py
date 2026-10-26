@@ -40,6 +40,7 @@ class AgentUpdater:
         trusted_public_key: ed25519.Ed25519PublicKey | bytes | None = None,
     ) -> None:
         self.secret_key = secret_key
+        self.trusted_public_key: ed25519.Ed25519PublicKey | None
         if isinstance(trusted_public_key, bytes):
             self.trusted_public_key = ed25519.Ed25519PublicKey.from_public_bytes(trusted_public_key)
         else:

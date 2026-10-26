@@ -1,0 +1,28 @@
+FROM jenkins/jenkins:lts-jdk17
+
+USER root
+
+# Install essential CLI tools for the controller
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    make \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI static binary so controller can interact with daemon
+RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz | tar -xz -C /usr/local/bin --strip-components=1 docker/docker \
+    && chmod +x /usr/local/bin/docker
+
+# Add jenkins user to docker group
+RUN groupadd -g 108 docker_host 2>/dev/null || true \
+    && usermod -aG 108 jenkins || true
+
+# Add git safe directory config for mounted repo
+RUN git config --system --add safe.directory '*'
+
+# Pre-bake plugins into image for fast, offline, reproducible startups
+COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN jenkins-plugin-cli -f /usr/share/jenkins/ref/plugins.txt --view-security-warnings
+
+USER jenkins

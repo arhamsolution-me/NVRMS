@@ -36,7 +36,10 @@ async def check_tcp_port(ip: str, port: int, timeout: float = 2.0) -> tuple[bool
             timeout=timeout,
         )
         writer.close()
-        await writer.wait_closed()
+        try:
+            await asyncio.wait_for(writer.wait_closed(), timeout=0.5)
+        except Exception:
+            pass
         return True, "Port reachable"
     except TimeoutError:
         return False, f"Connection to {ip}:{port} timed out after {timeout}s"

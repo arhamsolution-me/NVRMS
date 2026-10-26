@@ -117,10 +117,12 @@ class StreamWorker:
 
                 # Monitor stderr for activity and stall detection
                 while self._running and self._proc.returncode is None:
+                    if self._proc.stderr is None:
+                        break
                     try:
                         line = await asyncio.wait_for(
                             self._proc.stderr.readline(),
-                            timeout=self.stall_timeout,  # type: ignore[union-attr]
+                            timeout=self.stall_timeout,
                         )
                         if not line:
                             break

@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  jenkins-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.controller
+    container_name: nvrsms-jenkins-controller
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      - JENKINS_ADMIN_USER=${JENKINS_ADMIN_USER:-admin}
+      - JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-AdminPass2026!#}
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc.yaml
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=false
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    group_add:
+      - "108"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - ./casc.yaml:/var/jenkins_home/casc.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/d/NVRSMS:/mnt/d/NVRSMS
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 2048M
+        reservations:
+          cpus: '0.50'
+          memory: 512M
+    networks:
+      - jenkins_net
+
+  jenkins-dind:
+    image: docker:dind
+    container_name: nvrsms-jenkins-dind
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=
+    volumes:
+      - dind_data:/var/lib/docker
+    networks:
+      - jenkins_net
+
+networks:
+  jenkins_net:
+    driver: bridge
+
+volumes:
+  jenkins_data:
+  dind_data:

@@ -1,0 +1,14 @@
+configuration-as-code
+git
+workflow-aggregator
+docker-workflow
+junit
+htmlpublisher
+coverage
+timestamper
+ws-cleanup
+credentials-binding
+build-timeout
+pipeline-stage-view
+job-dsl
+ansicolor
